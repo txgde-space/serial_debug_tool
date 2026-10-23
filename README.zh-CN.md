@@ -1,10 +1,16 @@
+<p align="center">
+  <img src="Serial%20Debug%20Tool/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="112" height="112" alt="Serial Debug Tool 应用图标">
+</p>
+
+<h1 align="center">Serial Debug Tool</h1>
+
+<p align="center">
+  <a href="README.md">English</a> · 简体中文
+</p>
+
 > 本项目完全由 Codex 完成，人类主要负责点击“继续”，以及偶尔指出：“这个按钮怎么又歪了？”
 
-# Serial Debug Tool
-
-[English](README.md) · 简体中文
-
-使用 Swift、SwiftUI 和 AppKit 开发的 macOS 原生串口调试工具。用简洁的工作界面，完成设备连接、数据查看与命令发送。
+使用 Swift、SwiftUI 和 AppKit 开发的 macOS 原生串口调试工具。
 
 ## 下载使用
 
@@ -12,21 +18,11 @@
 
 ## 主要功能
 
-- **串口连接**：自动发现设备、手动输入路径、自定义波特率，以及数据位、停止位、校验和流控配置。
-- **文本与 HEX**：支持文本和十六进制收发显示，可选择多种字符编码与行尾格式。
-- **命令预设**：保存常用命令、直接行内编辑，支持“单次发送”和可调间隔的“定时发送”。
-- **实时输出**：搜索筛选、时间戳、自动换行、自动滚动、暂停显示，以及 RX/TX/SYS 独立显示开关。
-- **日志与计数**：导出日志，查看接收与发送字节统计。
-- **多窗口**：在独立串口会话中同时操作不同设备。
-- **外观与语言**：支持白天、黑夜及跟随系统主题；支持简体中文、英文及跟随系统语言。
-- **Dock 状态提示**：串口已连接时，应用图标显示小绿点。
+- **多窗口**：按 **⌘N（Command + N）** 新建串口窗口，每个窗口拥有独立的连接、日志和发送草稿。
+- **多命令预设**：保存多条常用命令、直接行内编辑，支持“单次发送”和可调间隔的“定时发送”。
 
 ## 从源码运行
 
 在 Xcode 中打开 `Serial Debug Tool.xcodeproj`，选择 **Serial Debug Tool** Scheme 和 **My Mac** 后运行。选择串口、配置参数，点击“连接串口”即可开始。
 
 支持 macOS 14 及以上版本。
-
-## 自动发布
-
-推送 `v1.0.0` 这样的版本标签后，会自动构建 macOS 通用版 ZIP 并发布到 Releases。也可在 [Actions 页面](https://github.com/txgde-space/serial_debug_tool/actions/workflows/release.yml)手动运行 **Build and Release**：标签留空时仅构建，填写已有版本标签时发布对应版本。构建采用临时签名，未经过 Apple 公证。

@@ -1,10 +1,16 @@
+<p align="center">
+  <img src="Serial%20Debug%20Tool/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="112" height="112" alt="Serial Debug Tool app icon">
+</p>
+
+<h1 align="center">Serial Debug Tool</h1>
+
+<p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
 > Built entirely by Codex. The human mostly clicked “Continue” — and occasionally asked, “Why is that button over there?”
 
-# Serial Debug Tool
-
-English · [简体中文](README.zh-CN.md)
-
-A native macOS serial debugging app built with Swift, SwiftUI, and AppKit. A clean workspace for connecting devices, reading serial output, and sending commands.
+A native macOS serial debugging tool built with Swift, SwiftUI, and AppKit.
 
 ## Download
 
@@ -12,21 +18,11 @@ Download the macOS app directly from [Releases](https://github.com/txgde-space/s
 
 ## Features
 
-- **Serial connections** — Device discovery, manual port paths, custom baud rates, and configurable data bits, stop bits, parity, and flow control.
-- **Text and HEX** — Send and view data in text or hexadecimal, with multiple character encodings and line endings.
-- **Command presets** — Save commands, edit them inline, and choose between **Send Once** and **Repeat** with an adjustable interval.
-- **Live output** — Search, timestamps, line wrapping, automatic scrolling, pause display, and independent RX/TX/SYS visibility.
-- **Logs and counters** — Export logs and track received and transmitted bytes.
-- **Multiple windows** — Work with separate devices in independent serial sessions.
-- **Appearance and language** — Light, dark, or system appearance; English and Simplified Chinese, with a follow-system option.
-- **Dock indicator** — A small green dot shows when a serial connection is active.
+- **Multiple windows** — Press **⌘N** to open a new serial window. Each window has its own connection, log, and send draft.
+- **Multiple command presets** — Save multiple commands, edit them inline, and choose between **Send Once** and **Repeat** with an adjustable interval.
 
 ## Build from Source
 
 Open `Serial Debug Tool.xcodeproj` in Xcode, select the **Serial Debug Tool** scheme and **My Mac**, then run. Choose a serial port, configure the connection, and click **Connect**.
 
 Requires macOS 14 or later.
-
-## Release Automation
-
-Push a version tag such as `v1.0.0` to automatically build and publish a universal macOS ZIP in Releases. You can also run **Build and Release** from the [Actions page](https://github.com/txgde-space/serial_debug_tool/actions/workflows/release.yml): leave the tag empty for a build only, or enter an existing version tag to publish it. Builds use ad-hoc signing and are not notarized.
