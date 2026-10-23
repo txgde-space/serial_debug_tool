@@ -1,0 +1,185 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to release (e.g. v1.0.0); leave empty to build only'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build universal macOS app
+    # The source references macOS 27 SwiftUI APIs, so use the Xcode 27 image.
+    runs-on: xcode-27
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      publish: ${{ steps.version.outputs.publish }}
+      artifact: ${{ steps.version.outputs.artifact }}
+    steps:
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="$INPUT_TAG"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            tag="$GITHUB_REF_NAME"
+          fi
+
+          if [[ -n "$tag" ]]; then
+            if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+              echo '::error::Use a version tag such as v1.0.0 or v1.0.0-beta.1.'
+              exit 1
+            fi
+            version="${tag#v}"
+            version="${version%%-*}"
+            label="$tag"
+            ref="refs/tags/$tag"
+            publish=true
+          else
+            version=0.0.0
+            label="build-$GITHUB_RUN_NUMBER"
+            ref="$GITHUB_REF"
+            publish=false
+          fi
+
+          {
+            printf 'tag=%s\n' "$tag"
+            printf 'version=%s\n' "$version"
+            printf 'label=%s\n' "$label"
+            printf 'ref=%s\n' "$ref"
+            printf 'publish=%s\n' "$publish"
+            printf 'artifact=Serial-Debug-Tool-%s-macOS-universal\n' "$label"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.version.outputs.ref }}
+          persist-credentials: false
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Run core tests
+        run: swift test --configuration release
+
+      - name: Build Release for Apple Silicon and Intel
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project "Serial Debug Tool.xcodeproj" \
+            -scheme "Serial Debug Tool" \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/SerialDebugToolBuild" \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="$APP_VERSION" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            build
+
+      - name: Sign, verify, and package
+        env:
+          RELEASE_LABEL: ${{ steps.version.outputs.label }}
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/SerialDebugToolBuild/Build/Products/Release/Serial Debug Tool.app"
+          executable="$app/Contents/MacOS/Serial Debug Tool"
+          output="$RUNNER_TEMP/release"
+          filename="Serial-Debug-Tool-${RELEASE_LABEL}-macOS-universal.zip"
+          test -x "$executable"
+          lipo -verify_arch arm64 x86_64 "$executable"
+          /usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist"
+
+          # Ad-hoc signing requires no certificate and retains serial-port sandbox access.
+          codesign --force --sign - \
+            --entitlements "Serial Debug Tool/Serial Debug Tool.entitlements" \
+            "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+
+          mkdir -p "$output"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$output/$filename"
+          (cd "$output" && shasum -a 256 "$filename" > SHA256SUMS.txt)
+          {
+            echo '### macOS universal build'
+            printf '\nPackage: `%s`\n' "$filename"
+            printf '\nArchitectures: arm64 + x86_64. Signing: ad-hoc, not notarized.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ${{ steps.version.outputs.artifact }}
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: dist
+
+      - name: Publish release with ZIP and checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum --check SHA256SUMS.txt)
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          Native macOS serial debugging tool for Apple Silicon and Intel Macs (macOS 14 or later).
+
+          Download the macOS universal ZIP below, extract it, and move **Serial Debug Tool.app** to **Applications**. `SHA256SUMS.txt` contains the package checksum.
+
+          This build is ad-hoc signed and is not notarized with an Apple Developer ID.
+
+          原生 macOS 串口调试工具，支持 Apple Silicon 与 Intel Mac（macOS 14 及以上）。下载下方通用版 ZIP，解压后将应用拖入“应用程序”即可。此构建采用临时签名，未经过 Apple 公证。
+          NOTES
+          flags=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          # Do not replace assets in an already published release.
+          gh release create "$RELEASE_TAG" dist/*.zip dist/SHA256SUMS.txt \
+            --verify-tag \
+            --title "Serial Debug Tool $RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            "${flags[@]}"

@@ -26,3 +26,7 @@ Download the macOS app directly from [Releases](https://github.com/txgde-space/s
 Open `Serial Debug Tool.xcodeproj` in Xcode, select the **Serial Debug Tool** scheme and **My Mac**, then run. Choose a serial port, configure the connection, and click **Connect**.
 
 Requires macOS 14 or later.
+
+## Release Automation
+
+Push a version tag such as `v1.0.0` to automatically build and publish a universal macOS ZIP in Releases. You can also run **Build and Release** from the [Actions page](https://github.com/txgde-space/serial_debug_tool/actions/workflows/release.yml): leave the tag empty for a build only, or enter an existing version tag to publish it. Builds use ad-hoc signing and are not notarized.

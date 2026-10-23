@@ -26,3 +26,7 @@
 在 Xcode 中打开 `Serial Debug Tool.xcodeproj`，选择 **Serial Debug Tool** Scheme 和 **My Mac** 后运行。选择串口、配置参数，点击“连接串口”即可开始。
 
 支持 macOS 14 及以上版本。
+
+## 自动发布
+
+推送 `v1.0.0` 这样的版本标签后，会自动构建 macOS 通用版 ZIP 并发布到 Releases。也可在 [Actions 页面](https://github.com/txgde-space/serial_debug_tool/actions/workflows/release.yml)手动运行 **Build and Release**：标签留空时仅构建，填写已有版本标签时发布对应版本。构建采用临时签名，未经过 Apple 公证。
