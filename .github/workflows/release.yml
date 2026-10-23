@@ -114,7 +114,7 @@ jobs:
           output="$RUNNER_TEMP/release"
           filename="Serial-Debug-Tool-${RELEASE_LABEL}-macOS-universal.zip"
           test -x "$executable"
-          lipo -verify_arch arm64 x86_64 "$executable"
+          lipo "$executable" -verify_arch arm64 x86_64
           /usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist"
 
           # Ad-hoc signing requires no certificate and retains serial-port sandbox access.
