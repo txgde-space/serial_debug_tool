@@ -1,0 +1,39 @@
+# macOS metadata
+.DS_Store
+._*
+
+# Xcode build output and personal workspace settings
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Swift Package Manager caches; keep Package.swift and Package.resolved
+.build/
+.swiftpm/Packages/
+.swiftpm/xcode/xcuserdata/
+
+# Packaged apps and release assets belong in GitHub Releases
+*.app/
+*.dSYM/
+*.xcarchive/
+*.zip
+*.dmg
+*.pkg
+/dist/
+
+# Downloaded Windows installers and local development notes
+/offline-installers/
+
+# Local agent configuration and signing credentials
+/.codex/
+/.agents/
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
