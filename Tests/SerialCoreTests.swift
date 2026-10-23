@@ -672,7 +672,8 @@ struct SerialIntegrationTests {
         #expect(Darwin.write(terminal.master, &byte, 1) == 1)
         try await Task.sleep(for: .milliseconds(25))
         session.clearLog()
-        try await Task.sleep(for: .milliseconds(100))
+        // Completion is asynchronous; a hosted runner may need more than 100 ms to deliver this byte.
+        try await waitUntil { session.receivedBytes == payload.count + 1 }
         #expect(session.receivedBytes == payload.count + 1)
         #expect(session.isConnected)
         await session.disconnect()
