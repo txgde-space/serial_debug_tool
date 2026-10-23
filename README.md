@@ -12,6 +12,10 @@
 
 A native macOS serial debugging tool built with Swift, SwiftUI, and AppKit.
 
+## Screenshot
+
+![Serial Debug Tool — English interface](docs/images/app-en.png)
+
 ## Download
 
 Download the macOS app directly from [Releases](https://github.com/txgde-space/serial_debug_tool/releases). Extract the ZIP and move **Serial Debug Tool.app** to **Applications** — no Xcode required.

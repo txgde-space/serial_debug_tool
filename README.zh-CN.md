@@ -12,6 +12,10 @@
 
 使用 Swift、SwiftUI 和 AppKit 开发的 macOS 原生串口调试工具。
 
+## 应用截图
+
+![Serial Debug Tool 中文界面](docs/images/app-zh-CN.png)
+
 ## 下载使用
 
 可以直接在本仓库的 [Releases](https://github.com/txgde-space/serial_debug_tool/releases) 页面下载 macOS 应用。解压 ZIP，将 **Serial Debug Tool.app** 拖入“应用程序”即可使用，无需安装 Xcode。
