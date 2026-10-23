@@ -642,8 +642,9 @@ struct SerialIntegrationTests {
 
         let payload = Data(repeating: 0x41, count: 1_048_576)
         var offset = 0
-        // Allow the burst to drain through the asynchronous reader without imposing a throughput target.
-        let deadline = ContinuousClock.now.advanced(by: .seconds(20))
+        // Hosted macOS runners can drain a PTY much more slowly than a local Mac.
+        // Keep a generous safety timeout: this checks exact bytes and bounded storage, not throughput.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(120))
         while offset < payload.count, ContinuousClock.now < deadline {
             let written = payload.withUnsafeBytes {
                 Darwin.write(terminal.master, $0.baseAddress?.advanced(by: offset), payload.count - offset)
