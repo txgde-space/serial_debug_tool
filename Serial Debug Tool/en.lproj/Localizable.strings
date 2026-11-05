@@ -190,3 +190,8 @@
 "script.error.name" = "Enter a script name of 1–80 characters.";
 "script.error.duplicate" = "A script with this name already exists. Choose another name.";
 "script.error.missing" = "This script was deleted in another window. Save a new copy.";
+
+/* Example receive scripts */
+"script.example.passThrough" = "Example: Pass Through";
+"script.example.fields" = "Example: Comma-separated Fields";
+"script.example.telemetry" = "Example: AZCT Telemetry";

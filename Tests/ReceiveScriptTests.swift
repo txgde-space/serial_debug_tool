@@ -35,6 +35,20 @@ struct ReceiveScriptTests {
         ReceiveScriptEngine(executableURL: URL(fileURLWithPath: try #require(scriptWorkerPath)))
     }
 
+    @Test func bundledExamplesProduceTheirDocumentedOutput() async throws {
+        let worker = try engine()
+        defer { worker.reset() }
+        let input = "$AZCT,M,1792643379,IDLE,35.86V,43.04mA"
+        let unchanged = try await worker.preview(source: ReceiveScriptExample.passThrough.source, text: input)
+        #expect(unchanged == input + "\n")
+        let fields = try await worker.preview(source: ReceiveScriptExample.separatedFields.source, text: "one, two,,中文")
+        #expect(fields == "one | two |  | 中文\n")
+        let telemetry = try await worker.preview(source: ReceiveScriptExample.azctTelemetry.source, text: input)
+        #expect(telemetry == "time=1792643379 | state=IDLE | voltage=35.86V | current=43.04mA\n")
+        let filtered = try await worker.preview(source: ReceiveScriptExample.azctTelemetry.source, text: "$AZCT,P,IDLE\n$AZCT,M,short")
+        #expect(filtered.isEmpty)
+    }
+
     @Test func stateFilteringAndWindowsStayIndependent() async throws {
         let first = try engine()
         let second = try engine()

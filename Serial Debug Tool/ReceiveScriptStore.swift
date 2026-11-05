@@ -23,12 +23,60 @@ enum ReceiveScriptStoreError: LocalizedError {
     }
 }
 
+enum ReceiveScriptExample: CaseIterable {
+    case passThrough
+    case separatedFields
+    case azctTelemetry
+
+    var name: String {
+        switch self {
+        case .passThrough: AppText.scriptExamplePassThrough
+        case .separatedFields: AppText.scriptExampleFields
+        case .azctTelemetry: AppText.scriptExampleTelemetry
+        }
+    }
+
+    var source: String {
+        switch self {
+        case .passThrough:
+            """
+            function process(text) {
+                // Return the line unchanged. Return null to hide a line.
+                return text;
+            }
+            """
+        case .separatedFields:
+            """
+            function process(text) {
+                // Format simple comma-separated fields for easier reading.
+                return text.split(",").map(field => field.trim()).join(" | ");
+            }
+            """
+        case .azctTelemetry:
+            """
+            function process(text) {
+                const fields = text.split(",");
+                // Keep only complete $AZCT,M telemetry records.
+                if (fields[0] !== "$AZCT" || fields[1] !== "M" || fields.length < 6) {
+                    return null;
+                }
+                return "time=" + fields[2]
+                    + " | state=" + fields[3]
+                    + " | voltage=" + fields[4]
+                    + " | current=" + fields[5];
+            }
+            """
+        }
+    }
+}
+
 /// Only the library is shared. Applying a script copies its source into a window's session.
 @MainActor
 @Observable
 final class ReceiveScriptStore {
     static let shared = ReceiveScriptStore()
     static let preferenceKey = "serial.receiveScripts.v1"
+    static let examplesInstalledKey = "serial.receiveScripts.examples.v1"
 
     private(set) var scripts: [SavedReceiveScript]
     @ObservationIgnored private let defaults: UserDefaults
@@ -37,7 +85,21 @@ final class ReceiveScriptStore {
         self.defaults = defaults
         scripts = defaults.data(forKey: Self.preferenceKey)
             .flatMap { try? JSONDecoder().decode([SavedReceiveScript].self, from: $0) } ?? []
-
+        if !defaults.bool(forKey: Self.examplesInstalledKey) {
+            // Seed once, including upgrades from an existing custom library. Deleted or edited
+            // examples stay deleted or edited on later launches.
+            for example in ReceiveScriptExample.allCases {
+                var name = example.name
+                var suffix = 2
+                while scripts.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+                    name = example.name + " (\(suffix))"
+                    suffix += 1
+                }
+                scripts.append(SavedReceiveScript(name: name, source: example.source))
+            }
+            persist()
+            defaults.set(true, forKey: Self.examplesInstalledKey)
+        }
     }
 
     func script(id: UUID?) -> SavedReceiveScript? {

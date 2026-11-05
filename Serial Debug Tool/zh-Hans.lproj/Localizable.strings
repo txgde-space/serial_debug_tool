@@ -190,3 +190,8 @@
 "script.error.name" = "请输入 1–80 个字符的脚本名称。";
 "script.error.duplicate" = "已有同名脚本，请使用其他名称。";
 "script.error.missing" = "该脚本已在其他窗口删除，请另存为新脚本。";
+
+/* Example receive scripts */
+"script.example.passThrough" = "示例：原样输出";
+"script.example.fields" = "示例：逗号分隔排版";
+"script.example.telemetry" = "示例：AZCT 遥测提取";

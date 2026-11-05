@@ -2,6 +2,18 @@ import Foundation
 
 /// All app-owned user-facing text. Keep protocol identifiers and persisted enum values unchanged.
 enum AppText {
+    static var scriptExamplePassThrough: String {
+        String(localized: "script.example.passThrough", defaultValue: "Example: Pass Through", bundle: bundle, locale: locale)
+    }
+
+    static var scriptExampleFields: String {
+        String(localized: "script.example.fields", defaultValue: "Example: Comma-separated Fields", bundle: bundle, locale: locale)
+    }
+
+    static var scriptExampleTelemetry: String {
+        String(localized: "script.example.telemetry", defaultValue: "Example: AZCT Telemetry", bundle: bundle, locale: locale)
+    }
+
     static var scriptLibrary: String {
         String(localized: "script.library", defaultValue: "Script Library", bundle: bundle, locale: locale)
     }

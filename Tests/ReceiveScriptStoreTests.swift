@@ -61,4 +61,32 @@ struct ReceiveScriptStoreTests {
         #expect(second.scriptSource.contains("two") && second.activeScriptID == nil)
         #expect(!first.preprocessingEnabled && !second.preprocessingEnabled)
     }
+
+    @Test func examplesInstallOnceAndPreserveUserEditsAndDeletions() throws {
+        let domain = "SerialDebugTool.ScriptStoreTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let store = ReceiveScriptStore(defaults: defaults)
+        #expect(store.scripts.count == 3)
+        let first = try #require(store.scripts.first)
+        let last = try #require(store.scripts.last)
+        try store.save(name: "My edited example", source: "function process(t) { return 'edited'; }", replacing: first.id)
+        store.remove(id: last.id)
+        let restored = ReceiveScriptStore(defaults: defaults)
+        #expect(restored.scripts == store.scripts)
+        #expect(restored.scripts.count == 2)
+    }
+
+    @Test func existingLibraryKeepsCustomScriptsAndNamesWhenExamplesAreAdded() throws {
+        let domain = "SerialDebugTool.ScriptStoreTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let custom = SavedReceiveScript(name: ReceiveScriptExample.passThrough.name, source: "custom code")
+        defaults.set(try JSONEncoder().encode([custom]), forKey: ReceiveScriptStore.preferenceKey)
+        let store = ReceiveScriptStore(defaults: defaults)
+        #expect(store.scripts.count == 4)
+        #expect(store.scripts.first == custom)
+        #expect(Set(store.scripts.map(\.name)).count == 4)
+        #expect(ReceiveScriptStore(defaults: defaults).scripts == store.scripts)
+    }
 }
