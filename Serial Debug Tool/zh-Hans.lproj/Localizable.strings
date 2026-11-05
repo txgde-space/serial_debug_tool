@@ -170,3 +170,23 @@
 "script.error.timeout" = "脚本执行超时或工作进程已停止。";
 "script.error.worker" = "无法启动 JavaScript 工作进程。";
 "script.error.stopped" = "预处理已停止：";
+
+/* Saved receive scripts */
+"script.library" = "脚本库";
+"script.draft" = "当前草稿";
+"script.new" = "新建脚本";
+"script.name" = "脚本名称";
+"script.save" = "保存脚本";
+"script.saveAs" = "另存为…";
+"script.delete" = "删除脚本…";
+"script.custom" = "自定义脚本";
+"script.manage" = "脚本…";
+"script.saveHelp" = "保存后可在任意窗口选择；点击“应用”仅改变当前窗口的处理内容。";
+"script.discardTitle" = "放弃未保存的脚本修改？";
+"script.discard" = "放弃修改";
+"script.discardHelp" = "切换脚本会替换当前编辑内容。";
+"script.deleteTitle" = "删除这个已保存脚本？";
+"script.deleteHelp" = "将移除脚本库中的副本，已使用该脚本的窗口仍保留当前处理内容。";
+"script.error.name" = "请输入 1–80 个字符的脚本名称。";
+"script.error.duplicate" = "已有同名脚本，请使用其他名称。";
+"script.error.missing" = "该脚本已在其他窗口删除，请另存为新脚本。";

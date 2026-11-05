@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var exportDocument = TerminalDocument(text: "")
     @State private var savingPreset = false
     @State private var presetName = ""
+    @State private var editingReceiveScript = false
     @State private var editingBaudRate = false
     @State private var customBaudRate = ""
     @State private var sendMode: SendMode = .command
@@ -108,6 +109,13 @@ struct ContentView: View {
         }
         .onDisappear {
             DockConnectionIndicator.shared.setConnected(false, for: dockWindowID)
+        }
+        .sheet(isPresented: $editingReceiveScript) {
+            ReceiveScriptEditor(source: session.scriptSource, enabled: session.preprocessingEnabled,
+                                scriptID: session.activeScriptID) { source, enabled, scriptID in
+                session.configurePreprocessing(source: source, enabled: enabled, scriptID: scriptID)
+            }
+            .environment(\.locale, AppLocalization.shared.locale)
         }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .plainText, defaultFilename: "Serial-\(Date().formatted(.iso8601.year().month().day()))") { result in
             if case .failure(let error) = result { session.errorMessage = error.localizedDescription }
@@ -317,20 +325,7 @@ struct ContentView: View {
 
     private var receiveControls: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                receiveDisplaySelector
-                Spacer(minLength: 8)
-                ViewThatFits(in: .horizontal) {
-                    logVisibilityControls
-                    Menu {
-                        logVisibilityOptions
-                    } label: {
-                        Label(AppText.displayOptions, systemImage: "line.3.horizontal.decrease")
-                    }
-                    .fixedSize()
-                    .help(AppText.displayOptions)
-                }
-            }
+            receiveHeader
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
                     logSearchField.frame(minWidth: 140)
@@ -349,6 +344,96 @@ struct ContentView: View {
         .toggleStyle(.checkbox)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    private var receiveHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                receiveDisplaySelector
+                preprocessingControls(compact: false)
+                Spacer(minLength: 8)
+                adaptiveLogVisibilityControls
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    receiveModePicker
+                    preprocessingControls(compact: true)
+                    Spacer(minLength: 0)
+                }
+                HStack {
+                    Spacer(minLength: 0)
+                    adaptiveLogVisibilityControls
+                }
+            }
+        }
+    }
+
+    private var adaptiveLogVisibilityControls: some View {
+        ViewThatFits(in: .horizontal) {
+            logVisibilityControls
+            Menu {
+                logVisibilityOptions
+            } label: {
+                Label(AppText.displayOptions, systemImage: "line.3.horizontal.decrease")
+            }
+            .fixedSize()
+            .help(AppText.displayOptions)
+        }
+    }
+
+    private var currentSavedScript: SavedReceiveScript? {
+        ReceiveScriptStore.shared.script(id: session.activeScriptID)
+            .flatMap { $0.source == session.scriptSource ? $0 : nil }
+    }
+
+    private func preprocessingControls(compact: Bool) -> some View {
+        HStack(spacing: 8) {
+            Toggle(AppText.scriptEnable, isOn: Binding(
+                get: { session.preprocessingEnabled },
+                set: {
+                    session.configurePreprocessing(source: session.scriptSource, enabled: $0,
+                                                   scriptID: session.activeScriptID)
+                }
+            ))
+            .help(AppText.scriptScope)
+            Menu {
+                ForEach(ReceiveScriptStore.shared.scripts) { script in
+                    Button {
+                        session.configurePreprocessing(source: script.source, enabled: session.preprocessingEnabled,
+                                                       scriptID: script.id)
+                    } label: {
+                        if currentSavedScript?.id == script.id {
+                            Label(script.name, systemImage: "checkmark")
+                        } else {
+                            Text(script.name)
+                        }
+                    }
+                }
+                if !ReceiveScriptStore.shared.scripts.isEmpty { Divider() }
+                Button(AppText.scriptManage) { editingReceiveScript = true }
+            } label: {
+                Text(currentSavedScript?.name ?? AppText.scriptCustom)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(width: compact ? 88 : 118, alignment: .leading)
+            }
+            .help(AppText.scriptLibrary)
+            .accessibilityLabel(AppText.scriptLibrary)
+            Button {
+                editingReceiveScript = true
+            } label: {
+                let symbol = session.scriptError == nil ? "curlybraces" : "exclamationmark.triangle.fill"
+                if compact {
+                    Image(systemName: symbol)
+                } else {
+                    Label(AppText.scriptManage, systemImage: symbol)
+                }
+            }
+            .foregroundStyle(session.scriptError == nil ? Color.primary : .red)
+            .accessibilityLabel(AppText.scriptManage)
+            .help(session.scriptError ?? AppText.scriptEdit)
+        }
+        .fixedSize()
     }
 
     private var logSearchField: some View {
@@ -390,15 +475,19 @@ struct ContentView: View {
     private var receiveDisplaySelector: some View {
         HStack(spacing: 12) {
             Text(AppText.receiveMonitor).font(.headline)
-            Picker(AppText.receiveDisplay, selection: $session.receiveHex) {
-                Text(AppText.textMode).tag(false)
-                Text("HEX").tag(true)
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(width: 112)
+            receiveModePicker
         }
         .fixedSize()
+    }
+
+    private var receiveModePicker: some View {
+        Picker(AppText.receiveDisplay, selection: $session.receiveHex) {
+            Text(AppText.textMode).tag(false)
+            Text("HEX").tag(true)
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 112)
     }
 
     private var logVisibilityControls: some View {

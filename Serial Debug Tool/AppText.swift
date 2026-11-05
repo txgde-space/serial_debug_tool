@@ -2,6 +2,78 @@ import Foundation
 
 /// All app-owned user-facing text. Keep protocol identifiers and persisted enum values unchanged.
 enum AppText {
+    static var scriptLibrary: String {
+        String(localized: "script.library", defaultValue: "Script Library", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDraft: String {
+        String(localized: "script.draft", defaultValue: "Current Draft", bundle: bundle, locale: locale)
+    }
+
+    static var scriptNew: String {
+        String(localized: "script.new", defaultValue: "New Script", bundle: bundle, locale: locale)
+    }
+
+    static var scriptName: String {
+        String(localized: "script.name", defaultValue: "Script Name", bundle: bundle, locale: locale)
+    }
+
+    static var scriptSave: String {
+        String(localized: "script.save", defaultValue: "Save Script", bundle: bundle, locale: locale)
+    }
+
+    static var scriptSaveAs: String {
+        String(localized: "script.saveAs", defaultValue: "Save As…", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDelete: String {
+        String(localized: "script.delete", defaultValue: "Delete Script…", bundle: bundle, locale: locale)
+    }
+
+    static var scriptCustom: String {
+        String(localized: "script.custom", defaultValue: "Custom Script", bundle: bundle, locale: locale)
+    }
+
+    static var scriptManage: String {
+        String(localized: "script.manage", defaultValue: "Scripts…", bundle: bundle, locale: locale)
+    }
+
+    static var scriptSaveHelp: String {
+        String(localized: "script.saveHelp", defaultValue: "Save to reuse in any window. Apply changes only this window's processing.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDiscardTitle: String {
+        String(localized: "script.discardTitle", defaultValue: "Discard unsaved script changes?", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDiscard: String {
+        String(localized: "script.discard", defaultValue: "Discard Changes", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDiscardHelp: String {
+        String(localized: "script.discardHelp", defaultValue: "Switching scripts replaces the current editor content.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDeleteTitle: String {
+        String(localized: "script.deleteTitle", defaultValue: "Delete this saved script?", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDeleteHelp: String {
+        String(localized: "script.deleteHelp", defaultValue: "The saved copy will be removed. Windows already using it keep their current script.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptInvalidName: String {
+        String(localized: "script.error.name", defaultValue: "Enter a script name of 1–80 characters.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDuplicateName: String {
+        String(localized: "script.error.duplicate", defaultValue: "A script with this name already exists. Choose another name.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptMissing: String {
+        String(localized: "script.error.missing", defaultValue: "This script was deleted in another window. Save a new copy.", bundle: bundle, locale: locale)
+    }
+
     static var scriptTitle: String {
         String(localized: "script.title", defaultValue: "Receive Preprocessing", bundle: bundle, locale: locale)
     }

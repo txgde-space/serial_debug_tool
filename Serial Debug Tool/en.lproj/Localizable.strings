@@ -170,3 +170,23 @@
 "script.error.timeout" = "The script exceeded its execution deadline or its worker stopped.";
 "script.error.worker" = "The JavaScript worker could not be started.";
 "script.error.stopped" = "RX preprocessing stopped: ";
+
+/* Saved receive scripts */
+"script.library" = "Script Library";
+"script.draft" = "Current Draft";
+"script.new" = "New Script";
+"script.name" = "Script Name";
+"script.save" = "Save Script";
+"script.saveAs" = "Save As…";
+"script.delete" = "Delete Script…";
+"script.custom" = "Custom Script";
+"script.manage" = "Scripts…";
+"script.saveHelp" = "Save to reuse in any window. Apply changes only this window's processing.";
+"script.discardTitle" = "Discard unsaved script changes?";
+"script.discard" = "Discard Changes";
+"script.discardHelp" = "Switching scripts replaces the current editor content.";
+"script.deleteTitle" = "Delete this saved script?";
+"script.deleteHelp" = "The saved copy will be removed. Windows already using it keep their current script.";
+"script.error.name" = "Enter a script name of 1–80 characters.";
+"script.error.duplicate" = "A script with this name already exists. Choose another name.";
+"script.error.missing" = "This script was deleted in another window. Save a new copy.";

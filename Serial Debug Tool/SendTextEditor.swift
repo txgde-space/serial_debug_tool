@@ -6,6 +6,7 @@ struct SendTextEditor: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String
     var onSend: () -> Void
+    var accessibilityLabel: String = AppText.sendContent
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -42,7 +43,7 @@ struct SendTextEditor: NSViewRepresentable {
         editor.isGrammarCheckingEnabled = false
         editor.allowsUndo = true
         editor.delegate = context.coordinator
-        editor.setAccessibilityLabel(AppText.sendContent)
+        editor.setAccessibilityLabel(accessibilityLabel)
         scrollView.documentView = editor
         updateEditor(editor)
         return scrollView
@@ -55,7 +56,7 @@ struct SendTextEditor: NSViewRepresentable {
     }
 
     private func updateEditor(_ editor: PlaceholderTextView) {
-        editor.setAccessibilityLabel(AppText.sendContent)
+        editor.setAccessibilityLabel(accessibilityLabel)
         if !editor.hasMarkedText(), editor.string != text {
             let selection = editor.selectedRange()
             editor.string = text
