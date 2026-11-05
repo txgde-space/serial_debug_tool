@@ -24,6 +24,7 @@ Download the macOS app directly from [Releases](https://github.com/txgde-space/s
 
 - **Multiple windows** — Press **⌘N** to open a new serial window. Each window has its own connection, log, and send draft.
 - **Multiple command presets** — Save multiple commands, edit them inline, and choose between **Send Once** and **Repeat** with an adjustable interval.
+- **Receive data preprocessing** — Transform or filter incoming serial text lines with JavaScript. Preview scripts, keep them in a reusable library, and start with three built-in examples. Clicking **Apply** saves the script automatically.
 
 ## Build from Source
 
