@@ -129,6 +129,24 @@ final class ReceiveScriptStore {
         return script
     }
 
+    func saveForApplying(name: String, source: String, replacing id: UUID? = nil) throws -> SavedReceiveScript {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return try save(name: trimmed, source: source, replacing: id)
+        }
+        if let existing = script(id: id) {
+            return try save(name: existing.name, source: source, replacing: id)
+        }
+        // Unnamed drafts get a unique localized name without overwriting another script.
+        var generatedName = AppText.scriptCustom
+        var suffix = 2
+        while scripts.contains(where: { $0.name.caseInsensitiveCompare(generatedName) == .orderedSame }) {
+            generatedName = AppText.scriptCustom + " (\(suffix))"
+            suffix += 1
+        }
+        return try save(name: generatedName, source: source, replacing: id)
+    }
+
     func remove(id: UUID) {
         scripts.removeAll { $0.id == id }
         persist()

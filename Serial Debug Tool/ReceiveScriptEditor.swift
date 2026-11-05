@@ -288,14 +288,16 @@ struct ReceiveScriptEditor: View {
         error = nil
         let code = source
         let shouldEnable = enabled
-        let appliedID = selectedScript.flatMap { $0.source == code ? $0.id : nil }
+        let scriptName = name
+        let existingID = selectedScript?.id
         operation = Task {
             do {
                 _ = try await previewEngine.transform([], source: code, generation: UUID())
                 guard !Task.isCancelled else { return }
                 previewEngine.reset()
                 if source == code {
-                    onApply(code, shouldEnable, appliedID)
+                    let saved = try store.saveForApplying(name: scriptName, source: code, replacing: existingID)
+                    onApply(saved.source, shouldEnable, saved.id)
                     dismiss()
                 }
             } catch {

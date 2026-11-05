@@ -5,6 +5,44 @@ import Testing
 @Suite("Saved receive scripts")
 @MainActor
 struct ReceiveScriptStoreTests {
+    @Test func applyingUnnamedDraftsCreatesDistinctPersistentScripts() throws {
+        let domain = "SerialDebugTool.ScriptStoreTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let store = ReceiveScriptStore(defaults: defaults)
+        let existing = try store.save(name: AppText.scriptCustom, source: "original")
+        let first = try store.saveForApplying(name: "  ", source: "first")
+        let second = try store.saveForApplying(name: "", source: "second")
+        #expect(Set([existing.name, first.name, second.name]).count == 3)
+        #expect(first.id != second.id)
+        let restored = ReceiveScriptStore(defaults: defaults)
+        #expect(restored.script(id: existing.id) == existing)
+        #expect(restored.script(id: first.id) == first)
+        #expect(restored.script(id: second.id) == second)
+    }
+
+    @Test func applyingExistingScriptUpdatesItsIdentityAndRejectsNameConflicts() throws {
+        let domain = "SerialDebugTool.ScriptStoreTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let store = ReceiveScriptStore(defaults: defaults)
+        let original = try store.save(name: "Telemetry", source: "old")
+        let count = store.scripts.count
+        let updated = try store.saveForApplying(name: "", source: "edited", replacing: original.id)
+        #expect(updated.id == original.id && updated.name == original.name)
+        #expect(store.scripts.count == count)
+        #expect(ReceiveScriptStore(defaults: defaults).script(id: original.id)?.source == "edited")
+        #expect(throws: ReceiveScriptStoreError.self) {
+            try store.saveForApplying(name: original.name, source: "another draft")
+        }
+        #expect(store.script(id: original.id) == updated)
+        store.remove(id: updated.id)
+        #expect(throws: ReceiveScriptStoreError.self) {
+            try store.saveForApplying(name: updated.name, source: "deleted draft", replacing: updated.id)
+        }
+        #expect(store.script(id: updated.id) == nil)
+    }
+
     @Test func saveRenameCopyAndDeletePersistWithStableIdentity() throws {
         let domain = "SerialDebugTool.ScriptStoreTests.\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: domain))
