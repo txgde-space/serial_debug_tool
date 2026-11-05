@@ -43,6 +43,7 @@
 "log.autoWrap" = "自动换行";
 "log.autoWrap.help" = "按窗口宽度折行显示，不改变接收数据";
 "log.autoScroll" = "自动滚动";
+"log.scrollToLatest" = "滚动到最新日志";
 "log.resume" = "恢复显示";
 "log.pause" = "暂停显示";
 "log.pause.help" = "暂停显示期间仍继续接收并统计字节";

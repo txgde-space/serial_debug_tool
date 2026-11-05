@@ -43,6 +43,7 @@
 "log.autoWrap" = "Wrap Lines";
 "log.autoWrap.help" = "Wrap lines to the window width without changing received data";
 "log.autoScroll" = "Auto-scroll";
+"log.scrollToLatest" = "Scroll to Latest Log";
 "log.resume" = "Resume";
 "log.pause" = "Pause";
 "log.pause.help" = "Data reception and byte counting continue while the display is paused";

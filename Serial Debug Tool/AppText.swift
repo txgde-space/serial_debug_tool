@@ -380,6 +380,10 @@ enum AppText {
         String(localized: "log.autoWrap.help", defaultValue: "Wrap lines to the window width without changing received data", bundle: bundle, locale: locale)
     }
 
+    static var scrollToLatestLog: String {
+        String(localized: "log.scrollToLatest", defaultValue: "Scroll to Latest Log", bundle: bundle, locale: locale)
+    }
+
     static var autoScroll: String {
         String(localized: "log.autoScroll", defaultValue: "Auto-scroll", bundle: bundle, locale: locale)
     }
