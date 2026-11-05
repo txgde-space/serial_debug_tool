@@ -107,6 +107,79 @@ private func receiveFromDevice(_ text: String, terminal: PseudoTerminal) throws 
     try #require(count == data.count)
 }
 
+@Suite("Preprocessed serial sessions", .serialized, .enabled(if: ProcessInfo.processInfo.environment["SERIAL_SCRIPT_WORKER"] != nil))
+@MainActor
+struct PreprocessedSessionTests {
+    private func makeSession(_ context: WindowTestContext) throws -> SerialSession {
+        let path = try #require(ProcessInfo.processInfo.environment["SERIAL_SCRIPT_WORKER"])
+        return SerialSession(defaults: context.defaults, presetStore: context.presets,
+                             scriptEngine: ReceiveScriptEngine(executableURL: URL(fileURLWithPath: path)))
+    }
+
+    @Test func processedDisplayRetainsRawExportHexAndCounters() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let device = try PseudoTerminal()
+        let session = try makeSession(context)
+        session.selectedPath = device.path
+        session.timestamps = false
+        session.showSystem = false
+        await session.connect()
+        session.configurePreprocessing(source: "function process(t) { return t === 'skip' ? null : t.toUpperCase(); }", enabled: true)
+        try receiveFromDevice("hel", terminal: device)
+        try await waitUntil { session.receivedBytes == 3 }
+        #expect(session.logText.isEmpty)
+        try receiveFromDevice("lo\r\nskip\n", terminal: device)
+        try await waitUntil { session.logText.contains("HELLO") }
+        #expect(session.receivedBytes == 12)
+        #expect(!session.logText.contains("skip"))
+        #expect(session.exportText().contains("73 6B 69 70 0A"))
+        session.receiveHex = true
+        #expect(session.logText.contains("73 6B 69 70 0A"))
+        session.receiveHex = false
+        #expect(session.logText.contains("HELLO"))
+        session.configurePreprocessing(source: session.scriptSource, enabled: false)
+        #expect(session.logText.contains("hello"))
+        #expect(session.logText.contains("skip"))
+        await session.disconnect()
+    }
+
+    @Test func timeoutFallsBackToRawAndReceptionContinues() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let device = try PseudoTerminal()
+        let session = try makeSession(context)
+        session.selectedPath = device.path
+        await session.connect()
+        session.configurePreprocessing(source: "function process(t) { while (true) {} }", enabled: true)
+        try receiveFromDevice("before\n", terminal: device)
+        try await waitUntil { session.scriptError != nil }
+        #expect(!session.preprocessingEnabled && session.isConnected)
+        try receiveFromDevice("after\n", terminal: device)
+        try await waitUntil { session.receivedBytes == 13 && session.logText.contains("after") }
+        #expect(session.logText.contains("before"))
+        await session.disconnect()
+    }
+
+    @Test func clearDiscardsPartialLinesAndResetsScriptState() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let device = try PseudoTerminal()
+        let session = try makeSession(context)
+        session.selectedPath = device.path
+        await session.connect()
+        session.configurePreprocessing(source: "let n = 0; function process(t) { return (++n) + ':' + t; }", enabled: true)
+        try receiveFromDevice("first\npartial", terminal: device)
+        try await waitUntil { session.logText.contains("1:first") }
+        session.clearLog()
+        try receiveFromDevice("fresh\n", terminal: device)
+        try await waitUntil { session.logText.contains("1:fresh") }
+        #expect(!session.logText.contains("partial"))
+        #expect(session.receivedBytes == 19)
+        await session.disconnect()
+    }
+}
+
 @Suite("Multiple serial windows", .serialized)
 struct MultiWindowTests {
     @Test @MainActor

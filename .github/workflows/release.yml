@@ -111,9 +111,11 @@ jobs:
           set -euo pipefail
           app="$RUNNER_TEMP/SerialDebugToolBuild/Build/Products/Release/Serial Debug Tool.app"
           executable="$app/Contents/MacOS/Serial Debug Tool"
+          helper="$app/Contents/MacOS/ReceiveScriptWorker"
           output="$RUNNER_TEMP/release"
           filename="Serial-Debug-Tool-${RELEASE_LABEL}-macOS-universal.zip"
           test -x "$executable"
+          test -x "$helper"
           architectures="$(xcrun lipo -archs "$executable")"
           printf 'Binary architectures: %s\n' "$architectures"
           for architecture in arm64 x86_64; do
@@ -123,6 +125,17 @@ jobs:
             fi
           done
           /usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist"
+
+          # The helper inherits the app sandbox when started by the app.
+          codesign --force --sign - \
+            --entitlements "ReceiveScriptWorker/ReceiveScriptWorker.entitlements" \
+            "$helper"
+
+          # Core tests run outside the app sandbox, so use a separately signed test copy.
+          cp "$helper" "$RUNNER_TEMP/ReceiveScriptWorkerTest"
+          codesign --force --sign - "$RUNNER_TEMP/ReceiveScriptWorkerTest"
+          SERIAL_SCRIPT_WORKER="$RUNNER_TEMP/ReceiveScriptWorkerTest" \
+            swift test --configuration release --filter 'ReceiveScriptTests|ReceiveLineTests|PreprocessedSessionTests'
 
           # Ad-hoc signing requires no certificate and retains serial-port sandbox access.
           codesign --force --sign - \

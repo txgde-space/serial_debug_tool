@@ -146,3 +146,27 @@
 "preset.repeat" = "Repeat preset “%1$@” using the panel interval";
 "receive.displayOptions" = "Display Options";
 "preset.repeat.stop" = "Stop repeating preset “%1$@”";
+
+/* Receive preprocessing */
+"script.title" = "Receive Preprocessing";
+"script.enable" = "Preprocess RX";
+"script.edit" = "Edit Script…";
+"script.help" = "process(text) receives one complete RX line without its CR/LF ending. Return a string to display, or null to filter it. JavaScript only; no Node.js APIs.";
+"script.scope" = "Applies to new data in this window. Applying, reconnecting, clearing, or changing encoding resets script state. HEX and export retain raw bytes.";
+"script.code" = "JavaScript";
+"script.sample" = "Sample Input";
+"script.result" = "Preview Result";
+"script.preview" = "Run Preview";
+"script.apply" = "Apply";
+"script.preview.empty" = "No output (empty or filtered).";
+"script.preview.hint" = "Run a preview to see the processed output.";
+"script.enabledHint" = "New RX lines · text display only";
+"script.disabledHint" = "CR / LF line processing";
+"script.error.function" = "Define a function named process(text).";
+"script.error.result" = "process(text) must return a string or null.";
+"script.error.line" = "An RX line exceeded 64 KB without a line ending. Preprocessing was stopped.";
+"script.error.output" = "The script or its output exceeded the size limit.";
+"script.error.backlog" = "Preprocessing could not keep up with reception. Raw reception continues.";
+"script.error.timeout" = "The script exceeded its execution deadline or its worker stopped.";
+"script.error.worker" = "The JavaScript worker could not be started.";
+"script.error.stopped" = "RX preprocessing stopped: ";

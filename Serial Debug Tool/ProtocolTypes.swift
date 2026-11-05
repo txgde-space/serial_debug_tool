@@ -201,7 +201,7 @@ enum LogDirection: String, Sendable {
     case system = "SYS"
 }
 
-struct LogEntry: Identifiable {
+struct LogEntry: Identifiable, Sendable {
     let id = UUID()
     let date: Date
     let direction: LogDirection

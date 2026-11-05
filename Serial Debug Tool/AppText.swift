@@ -2,6 +2,98 @@ import Foundation
 
 /// All app-owned user-facing text. Keep protocol identifiers and persisted enum values unchanged.
 enum AppText {
+    static var scriptTitle: String {
+        String(localized: "script.title", defaultValue: "Receive Preprocessing", bundle: bundle, locale: locale)
+    }
+
+    static var scriptEnable: String {
+        String(localized: "script.enable", defaultValue: "Preprocess RX", bundle: bundle, locale: locale)
+    }
+
+    static var scriptEdit: String {
+        String(localized: "script.edit", defaultValue: "Edit Script…", bundle: bundle, locale: locale)
+    }
+
+    static var scriptHelp: String {
+        String(localized: "script.help", defaultValue: "process(text) receives one complete RX line without its CR/LF ending. Return a string to display, or null to filter it. JavaScript only; no Node.js APIs.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptScope: String {
+        String(localized: "script.scope", defaultValue: "Applies to new data in this window. Applying, reconnecting, clearing, or changing encoding resets script state. HEX and export retain raw bytes.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptCode: String {
+        String(localized: "script.code", defaultValue: "JavaScript", bundle: bundle, locale: locale)
+    }
+
+    static var scriptSample: String {
+        String(localized: "script.sample", defaultValue: "Sample Input", bundle: bundle, locale: locale)
+    }
+
+    static var scriptResult: String {
+        String(localized: "script.result", defaultValue: "Preview Result", bundle: bundle, locale: locale)
+    }
+
+    static var scriptPreview: String {
+        String(localized: "script.preview", defaultValue: "Run Preview", bundle: bundle, locale: locale)
+    }
+
+    static var scriptApply: String {
+        String(localized: "script.apply", defaultValue: "Apply", bundle: bundle, locale: locale)
+    }
+
+    static var scriptPreviewEmpty: String {
+        String(localized: "script.preview.empty", defaultValue: "No output (empty or filtered).", bundle: bundle, locale: locale)
+    }
+
+    static var scriptPreviewHint: String {
+        String(localized: "script.preview.hint", defaultValue: "Run a preview to see the processed output.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptEnabledHint: String {
+        String(localized: "script.enabledHint", defaultValue: "New RX lines · text display only", bundle: bundle, locale: locale)
+    }
+
+    static var scriptDisabledHint: String {
+        String(localized: "script.disabledHint", defaultValue: "CR / LF line processing", bundle: bundle, locale: locale)
+    }
+
+    static var scriptInvalidFunction: String {
+        String(localized: "script.error.function", defaultValue: "Define a function named process(text).", bundle: bundle, locale: locale)
+    }
+
+    static var scriptInvalidResult: String {
+        String(localized: "script.error.result", defaultValue: "process(text) must return a string or null.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptLineTooLong: String {
+        String(localized: "script.error.line", defaultValue: "An RX line exceeded 64 KB without a line ending. Preprocessing was stopped.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptOutputTooLarge: String {
+        String(localized: "script.error.output", defaultValue: "The script or its output exceeded the size limit.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptBacklog: String {
+        String(localized: "script.error.backlog", defaultValue: "Preprocessing could not keep up with reception. Raw reception continues.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptTimeout: String {
+        String(localized: "script.error.timeout", defaultValue: "The script exceeded its execution deadline or its worker stopped.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptWorkerUnavailable: String {
+        String(localized: "script.error.worker", defaultValue: "The JavaScript worker could not be started.", bundle: bundle, locale: locale)
+    }
+
+    static var scriptStoppedPrefix: String {
+        String(localized: "script.error.stopped", defaultValue: "RX preprocessing stopped: ", bundle: bundle, locale: locale)
+    }
+
+    static func scriptStopped(_ message: String) -> String {
+        scriptStoppedPrefix + message
+    }
+
     static let appName = "Serial Debug Tool"
     static let hexPlaceholder = "AA 01 02 FF"
     static let devicePathPlaceholder = "/dev/cu.usbserial…"

@@ -48,6 +48,10 @@ final class SerialSession {
     var showSent = true { didSet { if showSent != oldValue { refreshLogDisplay() } } }
     var showSystem = true { didSet { if showSystem != oldValue { refreshLogDisplay() } } }
     var paused = false { didSet { if paused != oldValue, !paused { refreshLogDisplay() } } }
+    private(set) var preprocessingEnabled = false
+    private(set) var scriptSource = ReceiveScriptWorker.defaultSource
+    private(set) var activeScriptID: UUID?
+    private(set) var scriptError: String?
     var autoWrap = true
     var autoScroll = true
     var search = "" { didSet { if search != oldValue { refreshLogDisplay() } } }
@@ -72,19 +76,30 @@ final class SerialSession {
     @ObservationIgnored private var flushTask: Task<Void, Never>?
     @ObservationIgnored private var renderer = TerminalLogRenderer()
     @ObservationIgnored private var decoder = StreamingTextDecoder(encoding: .utf8)
+    @ObservationIgnored private let scriptEngine: ReceiveScriptEngine
+    @ObservationIgnored private var scriptGeneration = UUID()
+    @ObservationIgnored private var scriptTask: Task<Void, Never>?
+    @ObservationIgnored private var scriptPendingEntries: [LogEntry] = []
+    @ObservationIgnored private var scriptPendingBytes = 0
+    @ObservationIgnored private var processedEntries: [LogEntry] = []
+    @ObservationIgnored private var processedBytes = 0
+    @ObservationIgnored private var processedDiscarded = 0
     @ObservationIgnored private lazy var formatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss.SSS"
         return formatter
     }()
 
-    init(defaults: UserDefaults = .standard, presetStore: CommandPresetStore? = nil) {
+    init(defaults: UserDefaults = .standard, presetStore: CommandPresetStore? = nil, scriptEngine: ReceiveScriptEngine = ReceiveScriptEngine()) {
+        self.scriptEngine = scriptEngine
         self.defaults = defaults
         self.presetStore = presetStore ?? .shared
         selectedPath = defaults.string(forKey: "serial.path") ?? ""
         baudRate = defaults.string(forKey: "serial.baud") ?? "115200"
         savedPath = selectedPath
         savedBaudRate = baudRate
+        scriptSource = defaults.string(forKey: "serial.receiveScript") ?? ReceiveScriptWorker.defaultSource
+        activeScriptID = defaults.string(forKey: "serial.receiveScriptID").flatMap(UUID.init(uuidString:))
     }
 
     var configurationSummary: String {
@@ -127,6 +142,7 @@ final class SerialSession {
                 return
             }
             decoder = StreamingTextDecoder(encoding: encoding)
+            resetScriptProcessing()
             isConnected = true
             isConnecting = false
             connectionStatus = .connected(URL(fileURLWithPath: selectedPath).lastPathComponent)
@@ -146,6 +162,7 @@ final class SerialSession {
                     self.appendSystem(error.localizedDescription)
                 }
                 guard let self, self.sessionID == token else { return }
+                self.resetScriptProcessing(clearOutput: false)
                 self.isConnected = false
                 self.isSending = false
                 self.connectionStatus = .closed
@@ -170,6 +187,7 @@ final class SerialSession {
         streamTask?.cancel()
         streamTask = nil
         stopRepeating()
+        resetScriptProcessing(clearOutput: false)
         let wasActive = isConnected || isConnecting
         isConnected = false
         isConnecting = false
@@ -304,6 +322,7 @@ final class SerialSession {
     func clearLog() {
         flushTask?.cancel()
         flushTask = nil
+        resetScriptProcessing()
         entries.removeAll()
         pendingEntries.removeAll()
         receivedBytes += pendingReceivedBytes
@@ -373,6 +392,15 @@ final class SerialSession {
             appendedEntries.append(entry)
         }
         pendingEntries.removeAll(keepingCapacity: true)
+        if preprocessingEnabled {
+            scriptPendingEntries.append(contentsOf: appendedEntries)
+            scriptPendingBytes += appendedEntries.reduce(0) { $0 + $1.data.count + $1.text.utf8.count }
+            if scriptPendingBytes > 262_144 || scriptPendingEntries.count > 1500 {
+                failPreprocessing(ReceiveScriptFailure.backlog)
+            } else {
+                scheduleScriptProcessing()
+            }
+        }
         // Keep the UI bounded under continuous telemetry; counters continue counting all bytes.
         var removedCount = 0
         while entries.count - removedCount > 1500 || storageBytes > 512_000 {
@@ -396,6 +424,7 @@ final class SerialSession {
 
     private func rebuildLog() {
         renderer.invalidate()
+        resetScriptProcessing()
         decoder = StreamingTextDecoder(encoding: encoding)
         storageBytes = 0
         for index in entries.indices {
@@ -411,15 +440,92 @@ final class SerialSession {
     }
 
     private func renderLog(appendedEntries: [LogEntry], removedEntryIDs: [UUID]) {
+        let processed = preprocessingEnabled && !receiveHex
         renderer.render(
-            entries: entries,
-            discardedEntries: discardedEntries,
+            entries: processed ? processedEntries : entries,
+            discardedEntries: processed ? processedDiscarded : discardedEntries,
             options: LogDisplayOptions(hex: receiveHex, timestamps: timestamps, showReceived: showReceived, showSent: showSent, showSystem: showSystem, search: search),
-            appendedEntries: appendedEntries,
-            removedEntryIDs: removedEntryIDs
+            appendedEntries: processed ? nil : appendedEntries,
+            removedEntryIDs: processed ? [] : removedEntryIDs
         )
         logText = renderer.text
         logUpdate = renderer.update
+    }
+
+    func configurePreprocessing(source: String, enabled: Bool, scriptID: UUID? = nil) {
+        flush()
+        scriptSource = source
+        defaults.set(source, forKey: "serial.receiveScript")
+        activeScriptID = scriptID
+        defaults.set(scriptID?.uuidString, forKey: "serial.receiveScriptID")
+        preprocessingEnabled = enabled
+        scriptError = nil
+        resetScriptProcessing()
+        renderer.invalidate()
+        refreshLogDisplay()
+        if enabled { scheduleScriptProcessing() }
+    }
+
+    private func resetScriptProcessing(clearOutput: Bool = true) {
+        scriptGeneration = UUID()
+        scriptTask?.cancel()
+        scriptTask = nil
+        scriptPendingEntries.removeAll(keepingCapacity: true)
+        scriptPendingBytes = 0
+        scriptEngine.reset()
+        if clearOutput {
+            processedEntries.removeAll(keepingCapacity: true)
+            processedBytes = 0
+            processedDiscarded = 0
+            renderer.invalidate()
+        }
+    }
+
+    private func failPreprocessing(_ error: Error) {
+        preprocessingEnabled = false
+        scriptError = error.localizedDescription
+        resetScriptProcessing()
+        renderer.invalidate()
+        appendSystem(AppText.scriptStopped(error.localizedDescription))
+        needsRender = true
+    }
+
+    private func scheduleScriptProcessing() {
+        guard preprocessingEnabled, scriptTask == nil else { return }
+        let token = scriptGeneration
+        let source = scriptSource
+        scriptTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                repeat {
+                    let batch = self.scriptPendingEntries
+                    self.scriptPendingEntries.removeAll(keepingCapacity: true)
+                    self.scriptPendingBytes = 0
+                    let processed = try await self.scriptEngine.transform(batch, source: source, generation: token)
+                    guard !Task.isCancelled, self.scriptGeneration == token else { return }
+                    self.processedEntries.append(contentsOf: processed)
+                    self.processedBytes += processed.reduce(0) { $0 + $1.data.count + $1.text.utf8.count }
+                    var removed = 0
+                    while self.processedEntries.count - removed > 1500 || self.processedBytes > 512_000 {
+                        let entry = self.processedEntries[removed]
+                        self.processedBytes -= entry.data.count + entry.text.utf8.count
+                        removed += 1
+                    }
+                    if removed > 0 {
+                        self.processedEntries.removeFirst(removed)
+                        self.processedDiscarded += removed
+                    }
+                    if !self.paused, !self.receiveHex {
+                        self.renderLog(appendedEntries: [], removedEntryIDs: [])
+                    }
+                } while !self.scriptPendingEntries.isEmpty
+                self.scriptTask = nil
+            } catch {
+                guard !Task.isCancelled, self.scriptGeneration == token else { return }
+                self.failPreprocessing(error)
+                self.refreshLogDisplay()
+            }
+        }
     }
 
     private func savePreferences(force: Bool = false) {

@@ -146,3 +146,27 @@
 "preset.repeat" = "按面板设置的间隔定时发送预设“%1$@”";
 "receive.displayOptions" = "显示选项";
 "preset.repeat.stop" = "停止定时发送预设“%1$@”";
+
+/* Receive preprocessing */
+"script.title" = "预处理";
+"script.enable" = "预处理";
+"script.edit" = "编辑脚本…";
+"script.help" = "process(text) 接收不含 CR/LF 行尾的完整 RX 文本行。返回字符串用于显示，返回 null 过滤该行。仅支持 JavaScript，无 Node.js API。";
+"script.scope" = "应用于本窗口的新数据。应用脚本、重新连接、清空日志或切换编码会重置脚本状态。HEX 与导出保留原始字节。";
+"script.code" = "JavaScript";
+"script.sample" = "样例输入";
+"script.result" = "预览结果";
+"script.preview" = "运行预览";
+"script.apply" = "应用";
+"script.preview.empty" = "无输出（内容为空或已被过滤）。";
+"script.preview.hint" = "运行预览以查看处理结果。";
+"script.enabledHint" = "处理新 RX 行 · 仅文本显示";
+"script.disabledHint" = "按 CR / LF 分行处理";
+"script.error.function" = "请定义 process(text) 函数。";
+"script.error.result" = "process(text) 必须返回字符串或 null。";
+"script.error.line" = "RX 单行超过 64 KB，未收到换行符，已停止预处理。";
+"script.error.output" = "脚本或输出内容超过大小限制。";
+"script.error.backlog" = "预处理速度未能跟上接收速度，原始数据继续接收。";
+"script.error.timeout" = "脚本执行超时或工作进程已停止。";
+"script.error.worker" = "无法启动 JavaScript 工作进程。";
+"script.error.stopped" = "预处理已停止：";
