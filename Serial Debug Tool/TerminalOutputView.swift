@@ -128,7 +128,8 @@ private struct TerminalTextView: NSViewRepresentable {
         guard let view = scroll.documentView as? NSTextView, let storage = view.textStorage else { return }
         view.setAccessibilityLabel(AppText.outputLog)
         coordinator.onPositionChange = { [binding = $isAtLatest] in binding.wrappedValue = $0 }
-        let changed = coordinator.revision != update.revision
+        // Empty output is authoritative even if a cached native view missed a format update.
+        let changed = coordinator.revision != update.revision || (text.isEmpty && storage.length > 0)
         let wrappingChanged = coordinator.wrapLines != wrapLines
         let requestedLatest = coordinator.scrollToLatestRequest != scrollToLatestRequest
         let enabledAutoScroll = autoScroll && !coordinator.autoScroll
@@ -146,7 +147,8 @@ private struct TerminalTextView: NSViewRepresentable {
         }
         let visible = scroll.contentView.bounds.origin
         let selection = view.selectedRange()
-        let incremental = changed && coordinator.revision.map { $0 + 1 == update.revision } == true
+        // Clear the entire storage rather than deleting a prefix sized for the previous format.
+        let incremental = changed && !text.isEmpty && coordinator.revision.map { $0 + 1 == update.revision } == true
             && update.removedPrefixUTF16 + update.removedSuffixUTF16 <= storage.length
         var anchor = scrollToEnd ? nil : ViewportAnchor(view: view, visibleY: visible.y)
         if changed, var saved = anchor {

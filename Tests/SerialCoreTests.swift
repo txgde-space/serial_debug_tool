@@ -671,6 +671,48 @@ struct SerialIntegrationTests {
     }
 
     @Test @MainActor
+    func clearingEitherDisplayModeClearsAllViewsAndRawExport() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let terminal = try PseudoTerminal()
+        let session = context.session()
+        session.selectedPath = terminal.path
+        session.timestamps = false
+        session.showSystem = false
+        await session.connect()
+        defer { Task { await session.disconnect() } }
+        var received = 0
+        for hex in [false, true] {
+            session.receiveHex = hex
+            let old = "OLD_\(hex)\r\n"
+            try receiveFromDevice(old, terminal: terminal)
+            received += old.utf8.count
+            try await waitUntil { session.receivedBytes == received && !session.logText.isEmpty }
+            session.receiveHex.toggle()
+            #expect(!session.logText.isEmpty)
+            session.receiveHex = hex
+            session.clearLog()
+            #expect(session.logText.isEmpty)
+            for mode in [!hex, hex] {
+                session.receiveHex = mode
+                #expect(session.logText.isEmpty)
+            }
+            #expect(!session.exportText().contains(PayloadCodec.hex(Data(old.utf8))))
+            #expect(session.receivedBytes == received)
+            let fresh = "NEW_\(hex)\n"
+            try receiveFromDevice(fresh, terminal: terminal)
+            received += fresh.utf8.count
+            try await waitUntil { session.receivedBytes == received && !session.logText.isEmpty }
+            session.receiveHex = false
+            #expect(session.logText == "RX  " + fresh.trimmingCharacters(in: .newlines))
+            session.receiveHex = true
+            #expect(session.logText == "RX  " + PayloadCodec.hex(Data(fresh.utf8)))
+            session.clearLog()
+        }
+        await session.disconnect()
+    }
+
+    @Test @MainActor
     func fragmentedTelemetryRemainsOneLiveRowAcrossFlushes() async throws {
         let terminal = try PseudoTerminal()
         let session = SerialSession()
