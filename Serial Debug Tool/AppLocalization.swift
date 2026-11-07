@@ -62,6 +62,17 @@ final class AppLocalization: Observable, @unchecked Sendable {
         return selected == .system ? .autoupdatingCurrent : Locale(identifier: selected.rawValue)
     }
 
+    #if DEBUG
+    /// Documentation previews select a language without changing the user's preference.
+    @MainActor
+    func setPreviewLanguage(_ language: AppLanguage) {
+        guard language != self.language else { return }
+        registrar.withMutation(of: self, keyPath: \.language) {
+            lock.withLock { storedLanguage = language }
+        }
+    }
+    #endif
+
     @MainActor
     func setLanguage(_ language: AppLanguage) {
         guard language != self.language else { return }

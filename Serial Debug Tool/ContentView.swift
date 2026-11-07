@@ -918,6 +918,22 @@ struct ConnectionStatusView: View {
     ContentView()
 }
 
+#if DEBUG
+#Preview("Serial Debug Tool") {
+    ContentView()
+        .frame(width: 1440, height: 840)
+        .preferredColorScheme(.dark)
+        .onAppear { AppLocalization.shared.setPreviewLanguage(.english) }
+}
+
+#Preview("Serial Debug Tool") {
+    ContentView()
+        .frame(width: 1440, height: 840)
+        .preferredColorScheme(.dark)
+        .onAppear { AppLocalization.shared.setPreviewLanguage(.simplifiedChinese) }
+}
+#endif
+
 #Preview("紧凑窗口 · 浅色") {
     ContentView()
         .frame(width: 920, height: 640)
