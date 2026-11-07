@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 struct ReceiveScriptEditor: View {
@@ -21,8 +22,11 @@ struct ReceiveScriptEditor: View {
     @State private var confirmingSwitch = false
     @State private var pendingSelection: UUID?
     @State private var pendingDeletion: SavedReceiveScript?
-    @State private var savingCopy = false
-    @State private var copyName = ""
+    @State private var importing = false
+    @State private var exporting = false
+    @State private var exportDocument = ScriptDocument(source: "")
+    @State private var exportFilename = ""
+    @State private var pendingImport: ScriptFile?
     let store: ReceiveScriptStore
     let onApply: (String, Bool, UUID?) -> Void
 
@@ -72,15 +76,24 @@ struct ReceiveScriptEditor: View {
             }
             Divider()
             HStack(spacing: 10) {
-                Button { saveScript(asCopy: false) } label: {
-                    Label(AppText.scriptSave, systemImage: "square.and.arrow.down")
+                Button { saveScript() } label: {
+                    Label(AppText.scriptSave, systemImage: "tray.and.arrow.down")
                 }
                 .disabled(!canSave || (selectedScript != nil && !isDirty))
-                Button(AppText.scriptSaveAs) {
-                    copyName = ""
-                    savingCopy = true
+                Button {
+                    exportDocument = ScriptDocument(source: source)
+                    exportFilename = ScriptFile.exportFilename(name: name)
+                    exporting = true
+                } label: {
+                    Label(AppText.scriptSaveAs, systemImage: "square.and.arrow.up")
                 }
                 .disabled(running || source.utf8.count > purpose.sourceLimit)
+                Button {
+                    importing = true
+                } label: {
+                    Label(AppText.scriptImport, systemImage: "square.and.arrow.down")
+                }
+                .disabled(running)
                 Button { runPreview() } label: {
                     Label(AppText.scriptPreview, systemImage: "play")
                 }
@@ -107,10 +120,18 @@ struct ReceiveScriptEditor: View {
             sendPreviewEngine.reset()
         }
         .alert(AppText.scriptDiscardTitle, isPresented: $confirmingSwitch) {
-            Button(AppText.cancel, role: .cancel) { pendingSelection = nil }
-            Button(AppText.scriptDiscard, role: .destructive) {
-                if let pendingSelection { loadScript(pendingSelection) }
+            Button(AppText.cancel, role: .cancel) {
                 pendingSelection = nil
+                pendingImport = nil
+            }
+            Button(AppText.scriptDiscard, role: .destructive) {
+                if let pendingImport {
+                    importScript(pendingImport)
+                } else if let pendingSelection {
+                    loadScript(pendingSelection)
+                }
+                pendingSelection = nil
+                pendingImport = nil
             }
         } message: {
             Text(AppText.scriptDiscardHelp)
@@ -127,10 +148,21 @@ struct ReceiveScriptEditor: View {
         } message: {
             Text((pendingDeletion?.name ?? "") + "\n" + AppText.scriptDeleteHelp)
         }
-        .alert(AppText.scriptSaveAs, isPresented: $savingCopy) {
-            TextField(AppText.scriptName, text: $copyName)
-            Button(AppText.cancel, role: .cancel) {}
-            Button(AppText.save) { saveScript(asCopy: true) }
+        .fileExporter(isPresented: $exporting, document: exportDocument,
+                      contentType: .javaScript, defaultFilename: exportFilename) { result in
+            if case .failure(let error) = result { handleFileError(error) }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.javaScript, .plainText]) { result in
+            do {
+                let file = try ScriptFile.read(from: result.get(), sourceLimit: purpose.sourceLimit)
+                if isDirty {
+                    pendingSelection = nil
+                    pendingImport = file
+                    confirmingSwitch = true
+                } else {
+                    importScript(file)
+                }
+            } catch { handleFileError(error) }
         }
     }
 
@@ -245,16 +277,27 @@ struct ReceiveScriptEditor: View {
         error = nil
     }
 
-    private func saveScript(asCopy: Bool) {
+    private func saveScript() {
         do {
-            let saved = try store.save(name: asCopy ? copyName : name, source: source,
-                                       replacing: asCopy ? nil : selectedScript?.id)
+            let saved = try store.save(name: name, source: source, replacing: selectedScript?.id)
             selectedID = saved.id
             name = saved.name
             baselineName = saved.name
             baselineSource = saved.source
             error = nil
         } catch { self.error = error.localizedDescription }
+    }
+
+    private func importScript(_ file: ScriptFile) {
+        do {
+            let saved = try store.importScript(file)
+            loadScript(saved.id)
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func handleFileError(_ error: Error) {
+        guard (error as? CocoaError)?.code != .userCancelled else { return }
+        self.error = error.localizedDescription
     }
 
     private func editor(source: Binding<String>, title: String) -> some View {

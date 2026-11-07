@@ -155,6 +155,19 @@ final class ReceiveScriptStore {
         return try save(name: generatedName, source: source, replacing: id)
     }
 
+    func importScript(_ file: ScriptFile) throws -> SavedReceiveScript {
+        let trimmed = file.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = String((trimmed.isEmpty ? AppText.scriptCustom : trimmed).prefix(80))
+        var name = base
+        var suffix = 2
+        while scripts.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            let ending = " (\(suffix))"
+            name = String(base.prefix(max(0, 80 - ending.count))) + ending
+            suffix += 1
+        }
+        return try save(name: name, source: file.source)
+    }
+
     func remove(id: UUID) {
         scripts.removeAll { $0.id == id }
         persist()

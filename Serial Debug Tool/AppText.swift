@@ -2,6 +2,14 @@ import Foundation
 
 /// All app-owned user-facing text. Keep protocol identifiers and persisted enum values unchanged.
 enum AppText {
+    static var scriptImport: String {
+        String(localized: "script.import", defaultValue: "Import…", bundle: bundle, locale: locale)
+    }
+
+    static var scriptImportEncoding: String {
+        String(localized: "script.import.encoding", defaultValue: "Choose a UTF-8 JavaScript or text file.", bundle: bundle, locale: locale)
+    }
+
     static var sendScriptTitle: String {
         String(localized: "sendScript.title", defaultValue: "Send Scripts", bundle: bundle, locale: locale)
     }

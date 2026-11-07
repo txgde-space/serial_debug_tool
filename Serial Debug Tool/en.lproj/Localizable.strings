@@ -207,3 +207,7 @@
 "sendScript.example.text" = "Example: Text Message";
 "sendScript.example.sequence" = "Example: Sequence Counter";
 "sendScript.example.checksum" = "Example: Binary Checksum";
+
+/* Local script files */
+"script.import" = "Import…";
+"script.import.encoding" = "Choose a UTF-8 JavaScript or text file.";

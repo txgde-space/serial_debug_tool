@@ -207,3 +207,7 @@
 "sendScript.example.text" = "示例：文本消息";
 "sendScript.example.sequence" = "示例：递增序号";
 "sendScript.example.checksum" = "示例：二进制校验和";
+
+/* Local script files */
+"script.import" = "导入…";
+"script.import.encoding" = "请选择 UTF-8 编码的 JavaScript 或文本文件。";
