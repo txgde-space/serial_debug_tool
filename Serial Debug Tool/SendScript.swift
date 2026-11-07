@@ -26,6 +26,25 @@ enum SendScriptExample: CaseIterable {
     // State persists for the current repeat run and resets when stopped and restarted.
     """
 
+    /// Upgrade saved examples without replacing their code, names, or user comments.
+    static func addingUsageNotesIfNeeded(to source: String) -> String {
+        guard !source.hasPrefix(usageNotes) else { return source }
+        let code = executableLines(in: source)
+        guard allCases.contains(where: { executableLines(in: $0.body) == code }) else { return source }
+        let updated = source.replacingOccurrences(
+            of: "按界面间隔反复调用 generate(input)",
+            with: "按定时发送间隔反复调用 generate(input)"
+        )
+        return updated.hasPrefix(usageNotes) ? updated : usageNotes + "\n\n" + updated
+    }
+
+    private static func executableLines(in source: String) -> [String] {
+        source.components(separatedBy: .newlines).filter {
+            let line = $0.trimmingCharacters(in: .whitespaces)
+            return !line.isEmpty && !line.hasPrefix("//")
+        }
+    }
+
     private var body: String {
         switch self {
         case .text:

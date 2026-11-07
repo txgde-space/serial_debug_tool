@@ -90,6 +90,18 @@ final class ReceiveScriptStore {
         self.purpose = purpose
         scripts = defaults.data(forKey: storageKey)
             .flatMap { try? JSONDecoder().decode([SavedReceiveScript].self, from: $0) } ?? []
+        if purpose == .send {
+            // Older installs already have their examples in the library.
+            var updated = false
+            for index in scripts.indices {
+                let source = SendScriptExample.addingUsageNotesIfNeeded(to: scripts[index].source)
+                if source != scripts[index].source {
+                    scripts[index].source = source
+                    updated = true
+                }
+            }
+            if updated { persist() }
+        }
         if !defaults.bool(forKey: installedKey) {
             // Seed once, including upgrades from an existing custom library. Deleted or edited
             // examples stay deleted or edited on later launches.

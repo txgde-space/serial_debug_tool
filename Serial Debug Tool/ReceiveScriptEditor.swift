@@ -34,6 +34,7 @@ struct ReceiveScriptEditor: View {
          store: ReceiveScriptStore? = nil, purpose: ScriptPurpose = .receive, onApply: @escaping (String, Bool, UUID?) -> Void) {
         let store = store ?? (purpose == .receive ? .shared : .sendShared)
         self.purpose = store.purpose
+        let source = store.purpose == .send ? SendScriptExample.addingUsageNotesIfNeeded(to: source) : source
         let saved = store.script(id: scriptID).flatMap { $0.source == source ? $0 : nil }
         let draft = UUID()
         _source = State(initialValue: source)

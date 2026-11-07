@@ -560,9 +560,6 @@ struct ContentView: View {
                 sendActions(compact: false)
                 sendActions(compact: true)
             }
-            Text(session.sendHex ? AppText.hexEndingHelp : AppText.repeatHelp)
-                .font(.caption2).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

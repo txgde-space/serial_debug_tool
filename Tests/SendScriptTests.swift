@@ -7,6 +7,39 @@ private let sendWorkerPath = ProcessInfo.processInfo.environment["SERIAL_SCRIPT_
 @Suite("Send script library")
 @MainActor
 struct SendScriptLibraryTests {
+    @Test func existingExamplesGainGuidanceWithoutReplacingEditsOrRestoringDeletions() throws {
+        let domain = "SerialDebugTool.SendExampleMigration.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let originals = SendScriptExample.allCases.map { example in
+            let code = example.source.components(separatedBy: .newlines).filter {
+                !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//")
+            }.joined(separator: "\n").trimmingCharacters(in: .newlines)
+            return SavedReceiveScript(name: example.name, source: "// My own notes\n" + code)
+        }
+        let custom = SavedReceiveScript(name: "Modified example", source: originals[0].source.replacingOccurrences(of: "HELLO", with: "CUSTOM"))
+        defaults.set(try JSONEncoder().encode(originals + [custom]), forKey: "serial.sendScripts.v1")
+        defaults.set(true, forKey: "serial.sendScripts.examples.v1")
+
+        let store = ReceiveScriptStore(defaults: defaults, purpose: .send)
+        #expect(store.scripts.count == 4)
+        for original in originals {
+            let updated = try #require(store.script(id: original.id))
+            #expect(updated.name == original.name)
+            #expect(updated.source.hasSuffix(original.source))
+            #expect(updated.source.contains("输入框可以留空"))
+            #expect(updated.source.contains("do not write an infinite loop"))
+            #expect(updated.source.contains("停止后重新启动会重置"))
+            #expect(updated.source.contains("resets when stopped and restarted"))
+            #expect(SendScriptExample.addingUsageNotesIfNeeded(to: updated.source) == updated.source)
+            let previousWording = updated.source.replacingOccurrences(of: "按定时发送间隔", with: "按界面间隔")
+            #expect(SendScriptExample.addingUsageNotesIfNeeded(to: previousWording) == updated.source)
+        }
+        #expect(store.script(id: custom.id) == custom)
+        store.remove(id: originals[1].id)
+        #expect(ReceiveScriptStore(defaults: defaults, purpose: .send).scripts == store.scripts)
+    }
+
     @Test func librariesPersistIndependentlyAndKeepTheirExamples() throws {
         let domain = "SerialDebugTool.SendLibraryTests.\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: domain))
