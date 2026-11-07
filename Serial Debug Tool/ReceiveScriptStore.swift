@@ -75,20 +75,28 @@ enum ReceiveScriptExample: CaseIterable {
 @Observable
 final class ReceiveScriptStore {
     static let shared = ReceiveScriptStore()
+    static let sendShared = ReceiveScriptStore(purpose: .send)
     static let preferenceKey = "serial.receiveScripts.v1"
     static let examplesInstalledKey = "serial.receiveScripts.examples.v1"
 
-    private(set) var scripts: [SavedReceiveScript]
+    let purpose: ScriptPurpose
+    private var storageKey: String { purpose == .receive ? Self.preferenceKey : "serial.sendScripts.v1" }
+    private var installedKey: String { purpose == .receive ? Self.examplesInstalledKey : "serial.sendScripts.examples.v1" }
+    private(set) var scripts: [SavedReceiveScript] = []
     @ObservationIgnored private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, purpose: ScriptPurpose = .receive) {
         self.defaults = defaults
-        scripts = defaults.data(forKey: Self.preferenceKey)
+        self.purpose = purpose
+        scripts = defaults.data(forKey: storageKey)
             .flatMap { try? JSONDecoder().decode([SavedReceiveScript].self, from: $0) } ?? []
-        if !defaults.bool(forKey: Self.examplesInstalledKey) {
+        if !defaults.bool(forKey: installedKey) {
             // Seed once, including upgrades from an existing custom library. Deleted or edited
             // examples stay deleted or edited on later launches.
-            for example in ReceiveScriptExample.allCases {
+            let examples = purpose == .receive
+                ? ReceiveScriptExample.allCases.map { SavedReceiveScript(name: $0.name, source: $0.source) }
+                : SendScriptExample.allCases.map { SavedReceiveScript(name: $0.name, source: $0.source) }
+            for example in examples {
                 var name = example.name
                 var suffix = 2
                 while scripts.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
@@ -98,7 +106,7 @@ final class ReceiveScriptStore {
                 scripts.append(SavedReceiveScript(name: name, source: example.source))
             }
             persist()
-            defaults.set(true, forKey: Self.examplesInstalledKey)
+            defaults.set(true, forKey: installedKey)
         }
     }
 
@@ -110,7 +118,7 @@ final class ReceiveScriptStore {
     func save(name: String, source: String, replacing id: UUID? = nil) throws -> SavedReceiveScript {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 80 else { throw ReceiveScriptStoreError.invalidName }
-        guard source.utf8.count <= 65_536 else { throw ReceiveScriptStoreError.tooLarge }
+        guard source.utf8.count <= purpose.sourceLimit else { throw ReceiveScriptStoreError.tooLarge }
         guard !scripts.contains(where: { $0.id != id && $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
             throw ReceiveScriptStoreError.duplicateName
         }
@@ -154,6 +162,6 @@ final class ReceiveScriptStore {
 
     private func persist() {
         guard let data = try? JSONEncoder().encode(scripts) else { return }
-        defaults.set(data, forKey: Self.preferenceKey)
+        defaults.set(data, forKey: storageKey)
     }
 }

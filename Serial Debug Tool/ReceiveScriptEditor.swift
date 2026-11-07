@@ -16,6 +16,8 @@ struct ReceiveScriptEditor: View {
     @State private var running = false
     @State private var operation: Task<Void, Never>?
     @State private var previewEngine = ReceiveScriptEngine()
+    @State private var sendPreviewEngine = SendScriptEngine()
+    let purpose: ScriptPurpose
     @State private var confirmingSwitch = false
     @State private var pendingSelection: UUID?
     @State private var pendingDeletion: SavedReceiveScript?
@@ -25,8 +27,9 @@ struct ReceiveScriptEditor: View {
     let onApply: (String, Bool, UUID?) -> Void
 
     init(source: String, enabled: Bool, scriptID: UUID? = nil,
-         store: ReceiveScriptStore? = nil, onApply: @escaping (String, Bool, UUID?) -> Void) {
-        let store = store ?? .shared
+         store: ReceiveScriptStore? = nil, purpose: ScriptPurpose = .receive, onApply: @escaping (String, Bool, UUID?) -> Void) {
+        let store = store ?? (purpose == .receive ? .shared : .sendShared)
+        self.purpose = store.purpose
         let saved = store.script(id: scriptID).flatMap { $0.source == source ? $0 : nil }
         let draft = UUID()
         _source = State(initialValue: source)
@@ -36,6 +39,7 @@ struct ReceiveScriptEditor: View {
         _selectedID = State(initialValue: saved?.id ?? draft)
         _draftID = State(initialValue: draft)
         _enabled = State(initialValue: enabled)
+        if store.purpose == .send { _sample = State(initialValue: "HELLO") }
         self.store = store
         self.onApply = onApply
     }
@@ -44,16 +48,16 @@ struct ReceiveScriptEditor: View {
     private var selectedScript: SavedReceiveScript? { store.script(id: selectedID) }
     private var canSave: Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !running && !trimmed.isEmpty && trimmed.count <= 80 && source.utf8.count <= 65_536
+        return !running && !trimmed.isEmpty && trimmed.count <= 80 && source.utf8.count <= purpose.sourceLimit
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Label(AppText.scriptTitle, systemImage: "curlybraces")
+                Label(purpose.title, systemImage: "curlybraces")
                     .font(.title2.bold())
                 Spacer()
-                Toggle(AppText.scriptEnable, isOn: $enabled)
+                Toggle(purpose.enableTitle, isOn: $enabled)
                     .toggleStyle(.switch)
                     .controlSize(.small)
             }
@@ -76,7 +80,7 @@ struct ReceiveScriptEditor: View {
                     copyName = ""
                     savingCopy = true
                 }
-                .disabled(running || source.utf8.count > 65_536)
+                .disabled(running || source.utf8.count > purpose.sourceLimit)
                 Button { runPreview() } label: {
                     Label(AppText.scriptPreview, systemImage: "play")
                 }
@@ -87,7 +91,7 @@ struct ReceiveScriptEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button(AppText.scriptApply) { apply() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(running || source.utf8.count > 65_536)
+                    .disabled(running || source.utf8.count > purpose.sourceLimit)
             }
             .padding(16)
         }
@@ -100,6 +104,7 @@ struct ReceiveScriptEditor: View {
         .onDisappear {
             operation?.cancel()
             previewEngine.reset()
+            sendPreviewEngine.reset()
         }
         .alert(AppText.scriptDiscardTitle, isPresented: $confirmingSwitch) {
             Button(AppText.cancel, role: .cancel) { pendingSelection = nil }
@@ -232,7 +237,7 @@ struct ReceiveScriptEditor: View {
         guard id == draftID || store.script(id: id) != nil else { return }
         let script = store.script(id: id)
         selectedID = id
-        source = script?.source ?? ReceiveScriptWorker.defaultSource
+        source = script?.source ?? purpose.defaultSource
         name = script?.name ?? ""
         baselineSource = source
         baselineName = name
@@ -270,7 +275,9 @@ struct ReceiveScriptEditor: View {
         let input = sample
         operation = Task {
             do {
-                let output = try await previewEngine.preview(source: code, text: input)
+                let output = purpose == .receive
+                    ? try await previewEngine.preview(source: code, text: input)
+                    : try await sendPreviewEngine.preview(source: code, input: input)
                 guard !Task.isCancelled else { return }
                 if source == code, sample == input { result = output }
             } catch {
@@ -292,7 +299,11 @@ struct ReceiveScriptEditor: View {
         let existingID = selectedScript?.id
         operation = Task {
             do {
-                _ = try await previewEngine.transform([], source: code, generation: UUID())
+                if purpose == .receive {
+                    _ = try await previewEngine.transform([], source: code, generation: UUID())
+                } else {
+                    try await sendPreviewEngine.validate(source: code)
+                }
                 guard !Task.isCancelled else { return }
                 previewEngine.reset()
                 if source == code {
@@ -312,4 +323,8 @@ struct ReceiveScriptEditor: View {
 
 #Preview("Receive Script Library") {
     ReceiveScriptEditor(source: ReceiveScriptWorker.defaultSource, enabled: false) { _, _, _ in }
+}
+
+#Preview("Send Script Library") {
+    ReceiveScriptEditor(source: SendScriptExample.defaultSource, enabled: false, purpose: .send) { _, _, _ in }
 }

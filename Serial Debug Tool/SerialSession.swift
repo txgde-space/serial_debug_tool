@@ -52,6 +52,10 @@ final class SerialSession {
     private(set) var scriptSource = ReceiveScriptWorker.defaultSource
     private(set) var activeScriptID: UUID?
     private(set) var scriptError: String?
+    private(set) var sendScriptEnabled = false
+    private(set) var sendScriptSource = SendScriptExample.defaultSource
+    private(set) var activeSendScriptID: UUID?
+    private(set) var sendScriptError: String?
     var autoWrap = true
     var autoScroll = true
     var search = "" { didSet { if search != oldValue { refreshLogDisplay() } } }
@@ -76,6 +80,8 @@ final class SerialSession {
     @ObservationIgnored private var flushTask: Task<Void, Never>?
     @ObservationIgnored private var renderer = TerminalLogRenderer()
     @ObservationIgnored private var decoder = StreamingTextDecoder(encoding: .utf8)
+    @ObservationIgnored private let sendScriptEngine: SendScriptEngine
+    @ObservationIgnored private var sendScriptGeneration = UUID()
     @ObservationIgnored private let scriptEngine: ReceiveScriptEngine
     @ObservationIgnored private var scriptGeneration = UUID()
     @ObservationIgnored private var scriptTask: Task<Void, Never>?
@@ -90,8 +96,9 @@ final class SerialSession {
         return formatter
     }()
 
-    init(defaults: UserDefaults = .standard, presetStore: CommandPresetStore? = nil, scriptEngine: ReceiveScriptEngine = ReceiveScriptEngine()) {
+    init(defaults: UserDefaults = .standard, presetStore: CommandPresetStore? = nil, scriptEngine: ReceiveScriptEngine = ReceiveScriptEngine(), sendScriptEngine: SendScriptEngine = SendScriptEngine()) {
         self.scriptEngine = scriptEngine
+        self.sendScriptEngine = sendScriptEngine
         self.defaults = defaults
         self.presetStore = presetStore ?? .shared
         selectedPath = defaults.string(forKey: "serial.path") ?? ""
@@ -100,6 +107,8 @@ final class SerialSession {
         savedBaudRate = baudRate
         scriptSource = defaults.string(forKey: "serial.receiveScript") ?? ReceiveScriptWorker.defaultSource
         activeScriptID = defaults.string(forKey: "serial.receiveScriptID").flatMap(UUID.init(uuidString:))
+        sendScriptSource = defaults.string(forKey: "serial.sendScript") ?? SendScriptExample.defaultSource
+        activeSendScriptID = defaults.string(forKey: "serial.sendScriptID").flatMap(UUID.init(uuidString:))
     }
 
     var configurationSummary: String {
@@ -143,6 +152,7 @@ final class SerialSession {
             }
             decoder = StreamingTextDecoder(encoding: encoding)
             resetScriptProcessing()
+            resetSendScript()
             isConnected = true
             isConnecting = false
             connectionStatus = .connected(URL(fileURLWithPath: selectedPath).lastPathComponent)
@@ -213,6 +223,10 @@ final class SerialSession {
         isSending = true
         let token = sessionID
         defer { if token == sessionID { isSending = false } }
+        return await writePayload(data, token: token)
+    }
+
+    private func writePayload(_ data: Data, token: UUID) async -> Bool {
         do {
             let count = try await transport.write(data)
             guard token == sessionID else { return false }
@@ -233,12 +247,64 @@ final class SerialSession {
         }
     }
 
+    func configureSendScript(source: String, enabled: Bool, scriptID: UUID? = nil) {
+        if isRepeating, repeatingPresetID == nil { stopRepeating() }
+        sendScriptSource = source
+        sendScriptEnabled = enabled
+        activeSendScriptID = scriptID
+        sendScriptError = nil
+        defaults.set(source, forKey: "serial.sendScript")
+        defaults.set(scriptID?.uuidString, forKey: "serial.sendScriptID")
+        resetSendScript()
+    }
+
+    private func resetSendScript() {
+        sendScriptGeneration = UUID()
+        sendScriptEngine.reset()
+    }
+
+    @discardableResult
+    func sendCommand() async -> Bool {
+        guard !isRepeating else { return false }
+        if !sendScriptEnabled { return await send() }
+        return await sendGenerated(
+            input: input, source: sendScriptSource, generation: sendScriptGeneration,
+            textEncoding: encoding, lineEnding: ending
+        )
+    }
+
+    private func sendGenerated(
+        input: String, source: String, generation: UUID,
+        textEncoding: TextEncoding, lineEnding: LineEnding
+    ) async -> Bool {
+        guard isConnected, !isSending else { return false }
+        isSending = true
+        let token = sessionID
+        defer { if token == sessionID { isSending = false } }
+        do {
+            let payload = try await sendScriptEngine.generate(source: source, input: input, generation: generation)
+            // Stopping a timer, editing a script, or reconnecting invalidates work in flight.
+            guard !Task.isCancelled, token == sessionID, generation == sendScriptGeneration, isConnected else { return false }
+            sendScriptError = nil
+            guard let payload else { return true }
+            let data = try payload.data(encoding: textEncoding, ending: lineEnding)
+            return await writePayload(data, token: token)
+        } catch {
+            guard !Task.isCancelled, token == sessionID, generation == sendScriptGeneration else { return false }
+            sendScriptError = error.localizedDescription
+            errorMessage = error.localizedDescription
+            stopRepeating()
+            return false
+        }
+    }
+
     func toggleRepeating() {
         if isRepeating {
             stopRepeating()
             return
         }
-        startRepeating(text: input, hex: sendHex, lineEnding: ending, textEncoding: encoding)
+        startRepeating(text: input, hex: sendHex, lineEnding: ending, textEncoding: encoding,
+                       scriptSource: sendScriptEnabled ? sendScriptSource : nil)
     }
 
     func togglePresetRepeating(_ preset: CommandPreset) {
@@ -255,13 +321,15 @@ final class SerialSession {
 
     private func startRepeating(
         text: String, hex: Bool, lineEnding: LineEnding, textEncoding: TextEncoding,
-        presetID: UUID? = nil
+        presetID: UUID? = nil, scriptSource: String? = nil
     ) {
         guard isConnected, !isSending, let milliseconds = Int(interval), (10...3_600_000).contains(milliseconds) else {
             errorMessage = AppText.invalidInterval
             return
         }
-        // Capture the payload and parameters once; editing a preset never changes an active timer.
+        // Capture input, script, and parameters. Each scripted tick generates a fresh payload.
+        if scriptSource != nil { resetSendScript() }
+        let scriptGeneration = sendScriptGeneration
         isRepeating = true
         repeatingPresetID = presetID
         let taskID = UUID()
@@ -271,9 +339,14 @@ final class SerialSession {
                 guard let self, self.repeatTaskID == taskID, self.isConnected else { break }
                 // The library is shared across windows; a deleted command must not be sent again.
                 if let presetID, !self.presets.contains(where: { $0.id == presetID }) { break }
-                guard await self.send(
-                    text: text, hex: hex, lineEnding: lineEnding, textEncoding: textEncoding
-                ) else { break }
+                let sent: Bool
+                if let scriptSource {
+                    sent = await self.sendGenerated(input: text, source: scriptSource, generation: scriptGeneration,
+                                                    textEncoding: textEncoding, lineEnding: lineEnding)
+                } else {
+                    sent = await self.send(text: text, hex: hex, lineEnding: lineEnding, textEncoding: textEncoding)
+                }
+                guard sent else { break }
                 do { try await Task.sleep(for: .milliseconds(milliseconds)) } catch { break }
             }
             guard let self, self.repeatTaskID == taskID else { return }
@@ -282,6 +355,7 @@ final class SerialSession {
     }
 
     func stopRepeating() {
+        resetSendScript()
         repeatTaskID = nil
         repeatTask?.cancel()
         repeatTask = nil

@@ -2,6 +2,42 @@ import Foundation
 
 /// All app-owned user-facing text. Keep protocol identifiers and persisted enum values unchanged.
 enum AppText {
+    static var sendScriptTitle: String {
+        String(localized: "sendScript.title", defaultValue: "Send Scripts", bundle: bundle, locale: locale)
+    }
+
+    static var sendScriptEnable: String {
+        String(localized: "sendScript.enable", defaultValue: "Scripted Send", bundle: bundle, locale: locale)
+    }
+
+    static var sendScriptPlaceholder: String {
+        String(localized: "sendScript.input", defaultValue: "Script input (optional)…", bundle: bundle, locale: locale)
+    }
+
+    static var sendScriptHelp: String {
+        String(localized: "sendScript.help", defaultValue: "generate(input) returns text (using the selected encoding and line ending), bytes (sent unchanged), or null (skip).", bundle: bundle, locale: locale)
+    }
+
+    static var sendScriptInvalidFunction: String {
+        String(localized: "sendScript.error.function", defaultValue: "Define a function named generate(input).", bundle: bundle, locale: locale)
+    }
+
+    static var sendScriptInvalidResult: String {
+        String(localized: "sendScript.error.result", defaultValue: "generate(input) must return a string, a byte array (0–255, up to 16 KB), or null.", bundle: bundle, locale: locale)
+    }
+
+    static var sendExampleText: String {
+        String(localized: "sendScript.example.text", defaultValue: "Example: Text Message", bundle: bundle, locale: locale)
+    }
+
+    static var sendExampleSequence: String {
+        String(localized: "sendScript.example.sequence", defaultValue: "Example: Sequence Counter", bundle: bundle, locale: locale)
+    }
+
+    static var sendExampleChecksum: String {
+        String(localized: "sendScript.example.checksum", defaultValue: "Example: Binary Checksum", bundle: bundle, locale: locale)
+    }
+
     static var scriptExamplePassThrough: String {
         String(localized: "script.example.passThrough", defaultValue: "Example: Pass Through", bundle: bundle, locale: locale)
     }

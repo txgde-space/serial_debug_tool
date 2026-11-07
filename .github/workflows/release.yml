@@ -135,7 +135,7 @@ jobs:
           cp "$helper" "$RUNNER_TEMP/ReceiveScriptWorkerTest"
           codesign --force --sign - "$RUNNER_TEMP/ReceiveScriptWorkerTest"
           SERIAL_SCRIPT_WORKER="$RUNNER_TEMP/ReceiveScriptWorkerTest" \
-            swift test --configuration release --filter 'ReceiveScriptTests|ReceiveLineTests|PreprocessedSessionTests'
+            swift test --configuration release --filter 'ReceiveScriptTests|ReceiveLineTests|PreprocessedSessionTests|SendScriptTests|ScriptedSendSessionTests'
 
           # Ad-hoc signing requires no certificate and retains serial-port sandbox access.
           codesign --force --sign - \

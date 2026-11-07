@@ -180,6 +180,113 @@ struct PreprocessedSessionTests {
     }
 }
 
+@Suite("Scripted serial sending", .serialized, .enabled(if: ProcessInfo.processInfo.environment["SERIAL_SCRIPT_WORKER"] != nil))
+@MainActor
+struct ScriptedSendSessionTests {
+    private func session(_ context: WindowTestContext) throws -> SerialSession {
+        let path = try #require(ProcessInfo.processInfo.environment["SERIAL_SCRIPT_WORKER"])
+        return SerialSession(defaults: context.defaults, presetStore: context.presets,
+                             sendScriptEngine: SendScriptEngine(executableURL: URL(fileURLWithPath: path)))
+    }
+
+    @Test func generatedTextAndBinaryReachTheSerialDeviceExactly() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let terminal = try PseudoTerminal()
+        let session = try session(context)
+        session.selectedPath = terminal.path
+        await session.connect()
+        session.ending = .crlf
+        session.sendHex = true
+        session.configureSendScript(source: "function generate(input) { return '中文'; }", enabled: true)
+        #expect(await session.sendCommand())
+        let text = Data("中文\r\n".utf8)
+        #expect(try await readMaster(terminal.master, count: text.count) == text)
+        session.configureSendScript(source: "function generate(input) { return [0, 128, 255]; }", enabled: true)
+        #expect(await session.sendCommand())
+        #expect(try await readMaster(terminal.master, count: 3) == Data([0, 128, 255]))
+        #expect(session.sentBytes == text.count + 3)
+        session.input = "ignored input"
+        #expect(await session.send(text: "RAW", hex: false, lineEnding: LineEnding.none))
+        #expect(try await readMaster(terminal.master, count: 3) == Data("RAW".utf8))
+        await session.disconnect()
+    }
+
+    @Test func repeatedScriptRegeneratesFramesAndStopsWithoutLateWrites() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let terminal = try PseudoTerminal()
+        let session = try session(context)
+        session.selectedPath = terminal.path
+        await session.connect()
+        session.input = "P"
+        session.ending = .lf
+        session.interval = "20"
+        session.configureSendScript(source: SendScriptExample.sequence.source, enabled: true)
+        session.toggleRepeating()
+        let received = try await readMaster(terminal.master, count: 12)
+        #expect(received == Data("P,1\nP,2\nP,3\n".utf8))
+        session.stopRepeating()
+        let count = session.sentBytes
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(session.sentBytes == count)
+        #expect(!session.isRepeating)
+        await session.disconnect()
+    }
+
+    @Test func scriptFailureStopsTimerAndLeavesConnectionUsable() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let terminal = try PseudoTerminal()
+        let session = try session(context)
+        session.selectedPath = terminal.path
+        await session.connect()
+        session.interval = "20"
+        session.configureSendScript(source: "function generate() { while (true) {} }", enabled: true)
+        session.toggleRepeating()
+        try await waitUntil { session.sendScriptError != nil }
+        #expect(session.isConnected && !session.isRepeating && session.sentBytes == 0)
+        #expect(await session.send(text: "OK", hex: false, lineEnding: LineEnding.none))
+        #expect(try await readMaster(terminal.master, count: 2) == Data("OK".utf8))
+        await session.disconnect()
+    }
+
+    @Test func disconnectDiscardsGenerationInFlight() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let terminal = try PseudoTerminal()
+        let session = try session(context)
+        session.selectedPath = terminal.path
+        await session.connect()
+        session.configureSendScript(source: "function generate() { const end = Date.now() + 300; while (Date.now() < end) {} return 'LATE'; }", enabled: true)
+        let sending = Task { await session.sendCommand() }
+        try await waitUntil { session.isSending }
+        await session.disconnect()
+        #expect(await sending.value == false)
+        #expect(session.sentBytes == 0 && !session.isConnected)
+    }
+
+    @Test func stoppingTimerDiscardsGenerationBeforeAnyBytesAreWritten() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let terminal = try PseudoTerminal()
+        let session = try session(context)
+        session.selectedPath = terminal.path
+        await session.connect()
+        session.interval = "20"
+        session.configureSendScript(source: "function generate() { const end = Date.now() + 300; while (Date.now() < end) {} return 'LATE'; }", enabled: true)
+        session.toggleRepeating()
+        try await waitUntil { session.isSending }
+        session.stopRepeating()
+        try await waitUntil { !session.isSending }
+        var byte: UInt8 = 0
+        #expect(Darwin.read(terminal.master, &byte, 1) == -1)
+        #expect(errno == EAGAIN || errno == EWOULDBLOCK)
+        #expect(session.sentBytes == 0 && session.isConnected && !session.isRepeating)
+        await session.disconnect()
+    }
+}
+
 @Suite("Multiple serial windows", .serialized)
 struct MultiWindowTests {
     @Test @MainActor

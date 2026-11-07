@@ -196,3 +196,14 @@
 "script.example.passThrough" = "Example: Pass Through";
 "script.example.fields" = "Example: Comma-separated Fields";
 "script.example.telemetry" = "Example: AZCT Telemetry";
+
+/* Programmable send scripts */
+"sendScript.title" = "Send Scripts";
+"sendScript.enable" = "Scripted Send";
+"sendScript.input" = "Script input (optional)…";
+"sendScript.help" = "generate(input) returns text (using the selected encoding and line ending), bytes (sent unchanged), or null (skip).";
+"sendScript.error.function" = "Define a function named generate(input).";
+"sendScript.error.result" = "generate(input) must return a string, a byte array (0–255, up to 16 KB), or null.";
+"sendScript.example.text" = "Example: Text Message";
+"sendScript.example.sequence" = "Example: Sequence Counter";
+"sendScript.example.checksum" = "Example: Binary Checksum";

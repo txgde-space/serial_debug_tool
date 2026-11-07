@@ -196,3 +196,14 @@
 "script.example.passThrough" = "示例：原样输出";
 "script.example.fields" = "示例：逗号分隔排版";
 "script.example.telemetry" = "示例：AZCT 遥测提取";
+
+/* Programmable send scripts */
+"sendScript.title" = "发送脚本";
+"sendScript.enable" = "脚本发送";
+"sendScript.input" = "脚本输入（可留空）…";
+"sendScript.help" = "generate(input) 返回字符串（使用所选编码和行尾）、字节数组（原样发送）或 null（跳过本次）。";
+"sendScript.error.function" = "请定义 generate(input) 函数。";
+"sendScript.error.result" = "generate(input) 必须返回字符串、字节数组（0–255，最多 16 KB）或 null。";
+"sendScript.example.text" = "示例：文本消息";
+"sendScript.example.sequence" = "示例：递增序号";
+"sendScript.example.checksum" = "示例：二进制校验和";

@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var savingPreset = false
     @State private var presetName = ""
     @State private var editingReceiveScript = false
+    @State private var editingSendScript = false
     @State private var editingBaudRate = false
     @State private var customBaudRate = ""
     @State private var sendMode: SendMode = .command
@@ -114,6 +115,13 @@ struct ContentView: View {
             ReceiveScriptEditor(source: session.scriptSource, enabled: session.preprocessingEnabled,
                                 scriptID: session.activeScriptID) { source, enabled, scriptID in
                 session.configurePreprocessing(source: source, enabled: enabled, scriptID: scriptID)
+            }
+            .environment(\.locale, AppLocalization.shared.locale)
+        }
+        .sheet(isPresented: $editingSendScript) {
+            ReceiveScriptEditor(source: session.sendScriptSource, enabled: session.sendScriptEnabled,
+                                scriptID: session.activeSendScriptID, purpose: .send) { source, enabled, scriptID in
+                session.configureSendScript(source: source, enabled: enabled, scriptID: scriptID)
             }
             .environment(\.locale, AppLocalization.shared.locale)
         }
@@ -518,22 +526,30 @@ struct ContentView: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
                     sendInputMode
+                    sendScriptControls(compact: false)
                     Spacer(minLength: 8)
                     sendFormatControls(compact: false)
                 }
-                HStack(spacing: 10) {
-                    sendInputMode
-                    Spacer(minLength: 8)
-                    sendFormatControls(compact: true)
+                VStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        sendInputMode
+                        Spacer(minLength: 8)
+                        sendScriptControls(compact: true)
+                    }
+                    HStack {
+                        Spacer(minLength: 0)
+                        sendFormatControls(compact: true)
+                    }
                 }
             }
             .font(.caption)
             SendTextEditor(
                 text: $session.input,
-                placeholder: session.sendHex ? AppText.hexPlaceholder : AppText.sendPlaceholder,
+                placeholder: session.sendScriptEnabled ? AppText.sendScriptPlaceholder : session.sendHex ? AppText.hexPlaceholder : AppText.sendPlaceholder,
                 onSend: {
-                    guard session.isConnected, !session.isSending, !session.isRepeating, !session.input.isEmpty else { return }
-                    Task { await session.send() }
+                    guard session.isConnected, !session.isSending, !session.isRepeating,
+                          session.sendScriptEnabled || !session.input.isEmpty else { return }
+                    Task { await session.sendCommand() }
                 }
             )
             .frame(minHeight: 65, maxHeight: .infinity)
@@ -571,7 +587,60 @@ struct ContentView: View {
         HStack {
             Text(AppText.send).font(.headline)
             Toggle(AppText.hexInput, isOn: $session.sendHex).toggleStyle(.checkbox)
+                .disabled(session.sendScriptEnabled)
         }
+    }
+
+    private var currentSavedSendScript: SavedReceiveScript? {
+        ReceiveScriptStore.sendShared.script(id: session.activeSendScriptID)
+            .flatMap { $0.source == session.sendScriptSource ? $0 : nil }
+    }
+
+    private func sendScriptControls(compact: Bool) -> some View {
+        HStack(spacing: 8) {
+            Toggle(AppText.sendScriptEnable, isOn: Binding(
+                get: { session.sendScriptEnabled },
+                set: { session.configureSendScript(source: session.sendScriptSource, enabled: $0,
+                                                   scriptID: session.activeSendScriptID) }
+            ))
+            .help(AppText.sendScriptHelp)
+            Menu {
+                ForEach(ReceiveScriptStore.sendShared.scripts) { script in
+                    Button {
+                        session.configureSendScript(source: script.source, enabled: session.sendScriptEnabled,
+                                                    scriptID: script.id)
+                    } label: {
+                        if currentSavedSendScript?.id == script.id {
+                            Label(script.name, systemImage: "checkmark")
+                        } else {
+                            Text(script.name)
+                        }
+                    }
+                }
+                Divider()
+                Button(AppText.scriptManage) { editingSendScript = true }
+            } label: {
+                Text(currentSavedSendScript?.name ?? AppText.scriptCustom)
+                    .lineLimit(1)
+                    .frame(width: compact ? 88 : 118, alignment: .leading)
+            }
+            .accessibilityLabel(AppText.sendScriptTitle)
+            Button {
+                editingSendScript = true
+            } label: {
+                let symbol = session.sendScriptError == nil ? "curlybraces" : "exclamationmark.triangle.fill"
+                if compact {
+                    Image(systemName: symbol)
+                } else {
+                    Label(AppText.scriptManage, systemImage: symbol)
+                }
+            }
+            .foregroundStyle(session.sendScriptError == nil ? Color.primary : .red)
+            .accessibilityLabel(AppText.sendScriptTitle)
+            .help(session.sendScriptError ?? AppText.sendScriptHelp)
+        }
+        .fixedSize()
+        .disabled(session.isRepeating || session.isSending)
     }
 
     private func sendFormatControls(compact: Bool) -> some View {
@@ -610,7 +679,7 @@ struct ContentView: View {
         } label: {
             Label(AppText.saveAsPreset, systemImage: "bookmark")
         }
-        .disabled(session.input.isEmpty)
+        .disabled(session.input.isEmpty || session.sendScriptEnabled)
         .help(AppText.saveAsPreset)
     }
 
@@ -628,19 +697,19 @@ struct ContentView: View {
 
     private var repeatSendButton: some View {
         Button(session.isRepeating ? AppText.stopRepeating : AppText.repeatSend) { session.toggleRepeating() }
-            .disabled(!session.isRepeating && (!session.isConnected || session.input.isEmpty || session.isSending))
+            .disabled(!session.isRepeating && (!session.isConnected || (!session.sendScriptEnabled && session.input.isEmpty) || session.isSending))
     }
 
     private var sendCommandButton: some View {
         Button {
-            Task { await session.send() }
+            Task { await session.sendCommand() }
         } label: {
             Label(AppText.send, systemImage: "paperplane.fill")
                 .padding(.horizontal, 10)
         }
         .buttonStyle(.borderedProminent)
         .keyboardShortcut(.return, modifiers: .command)
-        .disabled(!session.isConnected || session.isRepeating || session.input.isEmpty || session.isSending)
+        .disabled(!session.isConnected || session.isRepeating || (!session.sendScriptEnabled && session.input.isEmpty) || session.isSending)
     }
 
     private var presetsPanel: some View {

@@ -12,7 +12,7 @@ let package = Package(
             name: "SerialDebugToolCore",
             path: "Serial Debug Tool",
             exclude: ["AppSettings.swift", "Assets.xcassets", "ContentView.swift", "DockConnectionIndicator.swift", "MyApp.swift", "PresetCommandRow.swift", "PresetCommandScrollView.swift", "ReceiveScriptEditor.swift", "SendTextEditor.swift", "SerialDevicePicker.swift", "TerminalDocument.swift", "TerminalOutputView.swift", "Serial Debug Tool.entitlements"],
-            sources: ["CommandPresetStore.swift", "AppLocalization.swift", "AppText.swift", "ProtocolTypes.swift", "ReceiveScript.swift", "ReceiveScriptStore.swift", "SerialTransport.swift", "SerialSession.swift", "TerminalLogRenderer.swift"],
+            sources: ["CommandPresetStore.swift", "AppLocalization.swift", "AppText.swift", "ProtocolTypes.swift", "ReceiveScript.swift", "ReceiveScriptStore.swift", "SendScript.swift", "SerialTransport.swift", "SerialSession.swift", "TerminalLogRenderer.swift"],
             resources: [.process("en.lproj"), .process("zh-Hans.lproj")]
         ),
         .testTarget(name: "SerialDebugToolCoreTests", dependencies: ["SerialDebugToolCore"], path: "Tests")
