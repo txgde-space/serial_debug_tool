@@ -116,6 +116,48 @@ struct PreprocessedSessionTests {
                              scriptEngine: ReceiveScriptEngine(executableURL: URL(fileURLWithPath: path)))
     }
 
+    @Test(arguments: [false, true])
+    func onlyChangingConnectedPortDisablesPreprocessing(changePort: Bool) async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let first = try PseudoTerminal()
+        let other = try PseudoTerminal()
+        let session = try makeSession(context)
+        let source = "let n = 0; function process(t) { return (++n) + ':' + t.toUpperCase(); }"
+        let scriptID = UUID()
+        session.selectedPath = first.path
+        session.timestamps = false
+        session.showSystem = false
+        await session.connect()
+        session.configurePreprocessing(source: source, enabled: true, scriptID: scriptID)
+        try receiveFromDevice("before\n", terminal: first)
+        try await waitUntil { session.logText.contains("1:BEFORE") }
+
+        await session.disconnect()
+        session.selectedPath = "/dev/nonexistent-\(UUID())"
+        await session.connect()
+        #expect(!session.isConnected && session.preprocessingEnabled)
+        let target = changePort ? other : first
+        session.selectedPath = target.path
+        await session.connect()
+        #expect(session.isConnected)
+        #expect(session.preprocessingEnabled == !changePort)
+        #expect(session.scriptSource == source && session.activeScriptID == scriptID)
+        #expect(session.scriptError == nil)
+        try receiveFromDevice("after\n", terminal: target)
+        if changePort {
+            try await waitUntil { session.logText.contains("after") }
+            #expect(!session.logText.contains("AFTER"))
+        } else {
+            try await waitUntil { session.logText.contains("1:AFTER") }
+        }
+
+        session.configurePreprocessing(source: source, enabled: true, scriptID: scriptID)
+        try receiveFromDevice("again\n", terminal: target)
+        try await waitUntil { session.logText.contains("1:AGAIN") }
+        await session.disconnect()
+    }
+
     @Test func processedDisplayRetainsRawExportHexAndCounters() async throws {
         let context = try WindowTestContext()
         defer { context.cleanUp() }

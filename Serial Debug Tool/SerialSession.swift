@@ -66,6 +66,7 @@ final class SerialSession {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let presetStore: CommandPresetStore
     @ObservationIgnored private var savedPath = ""
+    @ObservationIgnored private var lastConnectedPath: String?
     @ObservationIgnored private var savedBaudRate = ""
     @ObservationIgnored private var repeatTaskID: UUID?
     @ObservationIgnored private let transport = SerialTransport()
@@ -151,6 +152,12 @@ final class SerialSession {
                 return
             }
             decoder = StreamingTextDecoder(encoding: encoding)
+            // Keep preprocessing on reconnect; require opting in again for a different port.
+            if let lastConnectedPath, lastConnectedPath != configuration.path {
+                preprocessingEnabled = false
+            }
+            lastConnectedPath = configuration.path
+            scriptError = nil
             resetScriptProcessing()
             resetSendScript()
             isConnected = true
