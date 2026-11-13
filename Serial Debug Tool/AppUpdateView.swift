@@ -34,15 +34,22 @@ struct AppUpdateView: View {
             case .available(let release):
                 Label(AppText.updateAvailable(release.tagName), systemImage: "sparkles")
                     .font(.headline)
-                if let notes = release.body, !notes.isEmpty {
-                    ScrollView {
-                        Text(notes)
+                Text(AppText.updateWhatsNew).font(.headline)
+                ScrollView {
+                    if let notes = release.body, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        let text = notes.replacingOccurrences(of: #"(?m)^#{1,6}[ \t]+"#, with: "", options: .regularExpression)
+                        let formatted = try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
+                        Text(formatted ?? AttributedString(text))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text(AppText.updateNotesUnavailable)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(12)
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
                 }
+                .padding(12)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
             case .failed(let message):
                 Label(AppText.updateFailed, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)

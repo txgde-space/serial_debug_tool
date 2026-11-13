@@ -1,5 +1,7 @@
 /* App-owned interface text. Keep keys stable across releases. */
 "updates.close" = "关闭";
+"updates.whatsNew" = "更新内容";
+"updates.notesUnavailable" = "暂时无法获取更新说明，请打开下载页面查看本次更新内容。";
 "updates.title" = "软件更新";
 "updates.check" = "检查更新…";
 "updates.automatic" = "启动时自动检查更新";

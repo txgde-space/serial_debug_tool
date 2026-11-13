@@ -76,7 +76,7 @@ enum ReleaseService {
         guard data.count <= 1_000_000,
               let release = try? JSONDecoder().decode(AppRelease.self, from: data),
               release.isValidStableRelease else { throw UpdateCheckError.invalidResponse }
-        return release
+        return await includingNotes(in: release, using: session)
     }
 
     /// GitHub redirects this URL to its latest stable release without using the API quota.
@@ -90,9 +90,19 @@ enum ReleaseService {
         let release = AppRelease(tagName: url.lastPathComponent, htmlURL: url,
                                  body: nil, draft: false, prerelease: false)
         guard release.isValidStableRelease else { throw UpdateCheckError.invalidResponse }
-        return release
+        return await includingNotes(in: release, using: session)
     }
 
+    private static func includingNotes(in release: AppRelease, using session: URLSession) async -> AppRelease {
+        if let body = release.body, !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return release }
+        let feedURL = URL(string: "https://github.com/txgde-space/serial_debug_tool/releases.atom")!
+        let request = URLRequest(url: feedURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        guard let (data, response) = try? await session.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let notes = ReleaseNotes.fromFeed(data, releaseURL: release.htmlURL) else { return release }
+        return AppRelease(tagName: release.tagName, htmlURL: release.htmlURL, body: notes,
+                          draft: release.draft, prerelease: release.prerelease)
+    }
 }
 
 @MainActor

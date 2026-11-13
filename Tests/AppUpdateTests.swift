@@ -6,16 +6,27 @@ private func releaseFixture(_ tag: String = "v1.2.3", host: String = "github.com
     AppRelease(tagName: tag, htmlURL: URL(string: "https://\(host)/txgde-space/serial_debug_tool/releases/tag/\(tag)")!, body: "Release notes", draft: draft, prerelease: prerelease)
 }
 
+private let updateFeedFixture = """
+<feed xmlns="http://www.w3.org/2005/Atom">
+<entry><link rel="alternate" href="https://github.com/txgde-space/serial_debug_tool/releases/tag/v9.0.0"/>
+<content type="html">Wrong release notes</content></entry>
+<entry><link rel="alternate" href="https://github.com/txgde-space/serial_debug_tool/releases/tag/v1.2.3"/>
+<content type="html">&lt;h2&gt;更新内容&lt;/h2&gt;&lt;ul&gt;&lt;li&gt;新增发送 &amp;amp; 接收 &amp;lt;value&amp;gt; &amp;#x1F680;&lt;/li&gt;&lt;/ul&gt;</content></entry>
+</feed>
+"""
+
 private final class UpdateStub: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         let code = Int(request.value(forHTTPHeaderField: "X-Stub-Status") ?? "200")!
         let fallback = request.httpMethod == "HEAD"
+        let feed = request.url?.lastPathComponent == "releases.atom"
+        let missingNotes = feed && request.value(forHTTPHeaderField: "X-Stub-No-Notes") == "true"
         let responseURL = fallback ? releaseFixture().htmlURL : request.url!
-        let response = HTTPURLResponse(url: responseURL, statusCode: fallback ? 200 : code, httpVersion: nil,
+        let response = HTTPURLResponse(url: responseURL, statusCode: missingNotes ? 503 : (fallback || feed ? 200 : code), httpVersion: nil,
                                        headerFields: ["X-RateLimit-Remaining": "0"])!
-        let data = request.value(forHTTPHeaderField: "X-Stub-Invalid") == "true" ? Data("invalid".utf8) : Data(#"{"tag_name":"v1.2.3","html_url":"https://github.com/txgde-space/serial_debug_tool/releases/tag/v1.2.3","body":"Notes","draft":false,"prerelease":false}"#.utf8)
+        let data = feed ? Data(updateFeedFixture.utf8) : (request.value(forHTTPHeaderField: "X-Stub-Invalid") == "true" ? Data("invalid".utf8) : Data(#"{"tag_name":"v1.2.3","html_url":"https://github.com/txgde-space/serial_debug_tool/releases/tag/v1.2.3","body":"Notes","draft":false,"prerelease":false}"#.utf8))
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
@@ -25,6 +36,16 @@ private final class UpdateStub: URLProtocol, @unchecked Sendable {
 
 @Suite("Application updates")
 struct AppUpdateTests {
+    @Test func releaseNotesKeepTheMatchingVersionsFeaturesAndDecodeMarkup() throws {
+        let notes = try #require(ReleaseNotes.fromFeed(Data(updateFeedFixture.utf8), releaseURL: releaseFixture().htmlURL))
+        #expect(notes.contains("更新内容"))
+        #expect(notes.contains("• 新增发送 & 接收 <value> 🚀"))
+        #expect(!notes.contains("Wrong release notes"))
+        #expect(!notes.contains("<li>"))
+        #expect(ReleaseNotes.fromFeed(Data(updateFeedFixture.utf8), releaseURL: releaseFixture("v1.2.4").htmlURL) == nil)
+        #expect(ReleaseNotes.fromFeed(Data("<feed>".utf8), releaseURL: releaseFixture().htmlURL) == nil)
+    }
+
     @Test func versionsCompareNumericallyAndRejectNonStableTags() throws {
         #expect(try #require(AppVersion("v1.10.0")) > #require(AppVersion("1.9.9")))
         #expect(try #require(AppVersion("2.0.0")) > #require(AppVersion("1.99.99")))
@@ -45,10 +66,10 @@ struct AppUpdateTests {
     }
 
     @Test func serviceHandlesSuccessInvalidDataAndHTTPFailures() async throws {
-        func session(status: Int = 200, invalid: Bool = false) -> URLSession {
+        func session(status: Int = 200, invalid: Bool = false, noNotes: Bool = false) -> URLSession {
             let config = URLSessionConfiguration.ephemeral
             config.protocolClasses = [UpdateStub.self]
-            config.httpAdditionalHeaders = ["X-Stub-Status": String(status), "X-Stub-Invalid": String(invalid)]
+            config.httpAdditionalHeaders = ["X-Stub-Status": String(status), "X-Stub-Invalid": String(invalid), "X-Stub-No-Notes": String(noNotes)]
             return URLSession(configuration: config)
         }
         let success = session()
@@ -59,8 +80,13 @@ struct AppUpdateTests {
             defer { connection.invalidateAndCancel() }
             let fallback = try await ReleaseService.latest(using: connection)
             #expect(fallback.tagName == "v1.2.3")
-            #expect(fallback.body == nil)
+            #expect(fallback.body?.contains("新增发送") == true)
         }
+        let missingNotes = session(status: 403, noNotes: true)
+        defer { missingNotes.invalidateAndCancel() }
+        let withoutNotes = try await ReleaseService.latest(using: missingNotes)
+        #expect(withoutNotes.tagName == "v1.2.3")
+        #expect(withoutNotes.body == nil, "Unavailable notes must not hide a valid new version")
         for code in [404, 503] {
             let connection = session(status: code)
             defer { connection.invalidateAndCancel() }

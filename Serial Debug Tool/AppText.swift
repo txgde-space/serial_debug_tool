@@ -6,6 +6,14 @@ enum AppText {
         String(localized: "updates.close", defaultValue: "Close", bundle: bundle, locale: locale)
     }
 
+    static var updateWhatsNew: String {
+        String(localized: "updates.whatsNew", defaultValue: "What's New", bundle: bundle, locale: locale)
+    }
+
+    static var updateNotesUnavailable: String {
+        String(localized: "updates.notesUnavailable", defaultValue: "Release notes are unavailable. Open the download page to view the changes.", bundle: bundle, locale: locale)
+    }
+
     static var softwareUpdate: String {
         String(localized: "updates.title", defaultValue: "Software Update", bundle: bundle, locale: locale)
     }

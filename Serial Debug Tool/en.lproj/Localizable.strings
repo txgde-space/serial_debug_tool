@@ -1,5 +1,7 @@
 /* App-owned interface text. Keep keys stable across releases. */
 "updates.close" = "Close";
+"updates.whatsNew" = "What's New";
+"updates.notesUnavailable" = "Release notes are unavailable. Open the download page to view the changes.";
 "updates.title" = "Software Update";
 "updates.check" = "Check for Updates…";
 "updates.automatic" = "Check for updates at launch";
