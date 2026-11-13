@@ -39,25 +39,36 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 220, ideal: 232, max: 280)
         } detail: {
             VStack(spacing: 0) {
-                receiveControls
-                terminal
-                Divider()
-                ZStack(alignment: .topLeading) {
-                    switch sendMode {
-                    case .command:
-                        sendPanel
-                            .transition(sendPanelTransition)
-                            .zIndex(1)
-                    case .presets:
-                        presetsPanel
-                            .transition(sendPanelTransition)
-                            .zIndex(2)
+                VSplitView {
+                    VStack(spacing: 0) {
+                        receiveControls
+                        terminal
+                            .frame(minHeight: 80)
                     }
+                    .frame(minHeight: 180, maxHeight: .infinity)
+                    .layoutPriority(1)
+
+                    ZStack(alignment: .topLeading) {
+                        switch sendMode {
+                        case .command:
+                            sendPanel
+                                .transition(sendPanelTransition)
+                                .zIndex(1)
+                        case .presets:
+                            presetsPanel
+                                .transition(sendPanelTransition)
+                                .zIndex(2)
+                        }
+                    }
+                    .frame(
+                        minHeight: editingPresetID == nil ? 224 : 272,
+                        idealHeight: editingPresetID == nil ? 224 : 272,
+                        maxHeight: .infinity
+                    )
+                    .clipped()
+                    .animation(sendPanelAnimation, value: sendMode)
+                    .animation(interfaceAnimation, value: editingPresetID)
                 }
-                .frame(height: editingPresetID == nil ? 224 : 272)
-                .clipped()
-                .animation(sendPanelAnimation, value: sendMode)
-                .animation(interfaceAnimation, value: editingPresetID)
                 Divider()
                 footer
             }
