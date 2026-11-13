@@ -38,6 +38,7 @@ struct TerminalOutputView: View {
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
                     .accessibilityIdentifier("scrollToLatestLog")
                     .transition(.opacity)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(14)

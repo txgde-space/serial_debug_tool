@@ -18,6 +18,8 @@ struct ContentView: View {
     @State private var sendMode: SendMode = .command
     @State private var editingPresetID: UUID?
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    @State private var isWindowNarrow = false
+    @State private var sidebarCollapsedForWidth = false
 
     private enum SendMode: CaseIterable {
         case command
@@ -77,6 +79,11 @@ struct ContentView: View {
         .navigationSplitViewStyle(.balanced)
         .navigationTitle(AppText.appName)
         .frame(minWidth: 700, minHeight: 640)
+        .onGeometryChange(for: Bool.self) { geometry in
+            geometry.size.width < 960
+        } action: { isNarrow in
+            updateSidebarForWidth(isNarrow: isNarrow)
+        }
         .toolbar {
             ToolbarItemGroup {
                 Button {
@@ -102,7 +109,7 @@ struct ContentView: View {
         .task {
             // Apply the launch default after the split view restores its saved state.
             await Task.yield()
-            columnVisibility = .all
+            columnVisibility = isWindowNarrow ? .detailOnly : .all
             await session.monitor()
         }
         .onChange(of: session.presets.map(\.id)) { _, ids in
@@ -164,6 +171,18 @@ struct ContentView: View {
             Button(AppText.save) { session.savePreset(name: presetName) }
         } message: {
             Text(AppText.savePresetHelp)
+        }
+    }
+
+    private func updateSidebarForWidth(isNarrow: Bool) {
+        isWindowNarrow = isNarrow
+        if isNarrow, columnVisibility != .detailOnly {
+            sidebarCollapsedForWidth = true
+            withAnimation(interfaceAnimation) { columnVisibility = .detailOnly }
+        } else if !isNarrow, sidebarCollapsedForWidth {
+            // Restore only a sidebar hidden by resizing, leaving manual wide-window choices alone.
+            sidebarCollapsedForWidth = false
+            withAnimation(interfaceAnimation) { columnVisibility = .all }
         }
     }
 
