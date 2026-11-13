@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 @MainActor
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openWindow) private var openWindow
     @State private var session = SerialSession()
     @State private var dockWindowID = UUID()
     @State private var exporting = false
@@ -119,6 +120,11 @@ struct ContentView: View {
                     Label(AppText.settings, systemImage: "gearshape")
                 }
                 .help(AppText.settingsHelp)
+            }
+        }
+        .task {
+            if await AppUpdateChecker.shared.checkAutomatically() {
+                openWindow(id: "updates")
             }
         }
         .task {

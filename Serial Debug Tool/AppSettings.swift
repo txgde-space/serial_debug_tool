@@ -36,6 +36,8 @@ enum AppTheme: String, CaseIterable, Identifiable {
 
 struct AppSettingsView: View {
     @AppStorage("app.theme") private var theme: AppTheme = .system
+    @AppStorage("updates.checkAutomatically") private var automaticallyCheckUpdates = true
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let selectedTheme = theme
@@ -69,10 +71,25 @@ struct AppSettingsView: View {
                 Text(AppText.languageHelp)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                Toggle(AppText.updateAutomatically, isOn: $automaticallyCheckUpdates)
+                HStack {
+                    Text(AppText.updateCurrentVersion(AppUpdateChecker.shared.currentVersion))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(AppText.checkForUpdates) {
+                        openWindow(id: "updates")
+                        Task { await AppUpdateChecker.shared.check() }
+                    }
+                    .disabled(AppUpdateChecker.shared.isChecking)
+                }
+            } header: {
+                Label(AppText.softwareUpdate, systemImage: "arrow.down.circle")
+            }
         }
         .formStyle(.grouped)
         .environment(\.locale, AppLocalization.shared.locale)
-        .frame(width: 480, height: 350)
+        .frame(width: 480, height: 470)
         .onChange(of: theme) { _, theme in
             theme.applyAppearance()
         }

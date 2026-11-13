@@ -1,4 +1,18 @@
 /* App-owned interface text. Keep keys stable across releases. */
+"updates.close" = "Close";
+"updates.title" = "Software Update";
+"updates.check" = "Check for Updates…";
+"updates.automatic" = "Check for updates at launch";
+"updates.checking" = "Checking for updates…";
+"updates.current" = "You’re up to date.";
+"updates.failed" = "Unable to check for updates";
+"updates.download" = "Download Update…";
+"updates.releases" = "Open Releases";
+"updates.rateLimited" = "GitHub’s request limit has been reached. Please try again later.";
+"updates.invalidVersion" = "The current app version could not be determined.";
+"updates.invalidResponse" = "The update server returned an unexpected response. Please try again later.";
+"updates.installed" = "Current version: %1$@";
+"updates.available" = "Version %1$@ is available";
 "window.rename" = "Rename Window…";
 "window.name" = "Window Name";
 "toolbar.export" = "Export Log";

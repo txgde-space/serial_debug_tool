@@ -2,6 +2,62 @@ import Foundation
 
 /// All app-owned user-facing text. Keep protocol identifiers and persisted enum values unchanged.
 enum AppText {
+    static var updateClose: String {
+        String(localized: "updates.close", defaultValue: "Close", bundle: bundle, locale: locale)
+    }
+
+    static var softwareUpdate: String {
+        String(localized: "updates.title", defaultValue: "Software Update", bundle: bundle, locale: locale)
+    }
+
+    static var checkForUpdates: String {
+        String(localized: "updates.check", defaultValue: "Check for Updates…", bundle: bundle, locale: locale)
+    }
+
+    static var updateAutomatically: String {
+        String(localized: "updates.automatic", defaultValue: "Check for updates at launch", bundle: bundle, locale: locale)
+    }
+
+    static var updateChecking: String {
+        String(localized: "updates.checking", defaultValue: "Checking for updates…", bundle: bundle, locale: locale)
+    }
+
+    static var updateUpToDate: String {
+        String(localized: "updates.current", defaultValue: "You’re up to date.", bundle: bundle, locale: locale)
+    }
+
+    static var updateFailed: String {
+        String(localized: "updates.failed", defaultValue: "Unable to check for updates", bundle: bundle, locale: locale)
+    }
+
+    static var updateDownload: String {
+        String(localized: "updates.download", defaultValue: "Download Update…", bundle: bundle, locale: locale)
+    }
+
+    static var updateReleases: String {
+        String(localized: "updates.releases", defaultValue: "Open Releases", bundle: bundle, locale: locale)
+    }
+
+    static var updateRateLimited: String {
+        String(localized: "updates.rateLimited", defaultValue: "GitHub’s request limit has been reached. Please try again later.", bundle: bundle, locale: locale)
+    }
+
+    static var updateInvalidVersion: String {
+        String(localized: "updates.invalidVersion", defaultValue: "The current app version could not be determined.", bundle: bundle, locale: locale)
+    }
+
+    static var updateInvalidResponse: String {
+        String(localized: "updates.invalidResponse", defaultValue: "The update server returned an unexpected response. Please try again later.", bundle: bundle, locale: locale)
+    }
+
+    static func updateCurrentVersion(_ version: String) -> String {
+        String(localized: "updates.installed", defaultValue: "Current version: \(version)", bundle: bundle, locale: locale)
+    }
+
+    static func updateAvailable(_ version: String) -> String {
+        String(localized: "updates.available", defaultValue: "Version \(version) is available", bundle: bundle, locale: locale)
+    }
+
     static var renameWindow: String {
         String(localized: "window.rename", defaultValue: "Rename Window…", bundle: bundle, locale: locale)
     }

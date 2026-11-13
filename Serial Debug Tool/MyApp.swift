@@ -19,6 +19,12 @@ struct MyApp: App {
             SerialWindowCommands()
         }
 
+        Window(AppText.softwareUpdate, id: "updates") {
+            AppUpdateView()
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         Settings {
             AppSettingsView()
         }
@@ -32,6 +38,13 @@ private struct SerialWindowCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button(AppText.newSerialWindow) { openWindow(id: "serial") }
                 .keyboardShortcut("n", modifiers: .command)
+        }
+        CommandGroup(after: .appInfo) {
+            Button(AppText.checkForUpdates) {
+                openWindow(id: "updates")
+                Task { await AppUpdateChecker.shared.check() }
+            }
+            .disabled(AppUpdateChecker.shared.isChecking)
         }
     }
 }

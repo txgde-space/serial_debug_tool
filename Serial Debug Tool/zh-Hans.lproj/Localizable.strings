@@ -1,4 +1,18 @@
 /* App-owned interface text. Keep keys stable across releases. */
+"updates.close" = "关闭";
+"updates.title" = "软件更新";
+"updates.check" = "检查更新…";
+"updates.automatic" = "启动时自动检查更新";
+"updates.checking" = "正在检查更新…";
+"updates.current" = "当前已是最新版本。";
+"updates.failed" = "无法检查更新";
+"updates.download" = "下载更新…";
+"updates.releases" = "打开下载页面";
+"updates.rateLimited" = "GitHub 请求次数已达上限，请稍后重试。";
+"updates.invalidVersion" = "无法识别当前应用版本。";
+"updates.invalidResponse" = "更新服务器返回了异常内容，请稍后重试。";
+"updates.installed" = "当前版本：%1$@";
+"updates.available" = "发现新版本 %1$@";
 "window.rename" = "重命名窗口…";
 "window.name" = "窗口名称";
 "toolbar.export" = "导出日志";
