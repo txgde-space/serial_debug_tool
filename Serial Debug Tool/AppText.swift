@@ -2,6 +2,14 @@ import Foundation
 
 /// All app-owned user-facing text. Keep protocol identifiers and persisted enum values unchanged.
 enum AppText {
+    static var renameWindow: String {
+        String(localized: "window.rename", defaultValue: "Rename Window…", bundle: bundle, locale: locale)
+    }
+
+    static var windowName: String {
+        String(localized: "window.name", defaultValue: "Window Name", bundle: bundle, locale: locale)
+    }
+
     static var scriptImport: String {
         String(localized: "script.import", defaultValue: "Import…", bundle: bundle, locale: locale)
     }

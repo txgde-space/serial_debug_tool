@@ -1,4 +1,6 @@
 /* App-owned interface text. Keep keys stable across releases. */
+"window.rename" = "Rename Window…";
+"window.name" = "Window Name";
 "toolbar.export" = "Export Log";
 "toolbar.export.help" = "Export raw HEX logs from the current buffer";
 "action.clear" = "Clear";

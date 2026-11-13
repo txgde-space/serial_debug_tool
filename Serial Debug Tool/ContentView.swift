@@ -21,6 +21,8 @@ struct ContentView: View {
     @State private var isWindowNarrow = false
     @State private var sidebarCollapsedForWidth = false
     @State private var windowTitle = AppText.appName
+    @State private var editingWindowTitle = false
+    @State private var windowTitleDraft = ""
 
     private let minimumWindowWidth = (NSScreen.main?.visibleFrame.width ?? 1440) / 3
 
@@ -80,7 +82,7 @@ struct ContentView: View {
             .frame(minWidth: min(450, minimumWindowWidth))
         }
         .navigationSplitViewStyle(.balanced)
-        .navigationTitle($windowTitle)
+        .navigationTitle(windowTitle)
         .frame(minWidth: minimumWindowWidth, minHeight: 640)
         .onGeometryChange(for: Bool.self) { geometry in
             geometry.size.width < 960
@@ -88,6 +90,16 @@ struct ContentView: View {
             updateSidebarForWidth(isNarrow: isNarrow)
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    windowTitleDraft = windowTitle
+                    editingWindowTitle = true
+                } label: {
+                    Label(AppText.renameWindow, systemImage: "pencil")
+                }
+                .help(AppText.renameWindow)
+                .accessibilityIdentifier("renameWindow")
+            }
             ToolbarItemGroup {
                 Button {
                     exportDocument = TerminalDocument(text: session.exportText())
@@ -153,6 +165,14 @@ struct ContentView: View {
             Button(AppText.ok) { session.errorMessage = nil }
         } message: {
             Text(session.errorMessage ?? "")
+        }
+        .alert(AppText.renameWindow, isPresented: $editingWindowTitle) {
+            TextField(AppText.windowName, text: $windowTitleDraft)
+            Button(AppText.cancel, role: .cancel) {}
+            Button(AppText.save) {
+                let name = windowTitleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                windowTitle = name.isEmpty ? AppText.appName : name
+            }
         }
         .alert(AppText.customBaudRate, isPresented: $editingBaudRate) {
             TextField(AppText.baudExample, text: $customBaudRate)

@@ -1,4 +1,6 @@
 /* App-owned interface text. Keep keys stable across releases. */
+"window.rename" = "重命名窗口…";
+"window.name" = "窗口名称";
 "toolbar.export" = "导出日志";
 "toolbar.export.help" = "导出当前缓冲区的原始 HEX 日志";
 "action.clear" = "清空";
