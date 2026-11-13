@@ -20,6 +20,9 @@ struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @State private var isWindowNarrow = false
     @State private var sidebarCollapsedForWidth = false
+    @State private var windowTitle = AppText.appName
+
+    private let minimumWindowWidth = (NSScreen.main?.visibleFrame.width ?? 1440) / 3
 
     private enum SendMode: CaseIterable {
         case command
@@ -74,11 +77,11 @@ struct ContentView: View {
                 Divider()
                 footer
             }
-            .frame(minWidth: 450)
+            .frame(minWidth: min(450, minimumWindowWidth))
         }
         .navigationSplitViewStyle(.balanced)
-        .navigationTitle(AppText.appName)
-        .frame(minWidth: 700, minHeight: 640)
+        .navigationTitle($windowTitle)
+        .frame(minWidth: minimumWindowWidth, minHeight: 640)
         .onGeometryChange(for: Bool.self) { geometry in
             geometry.size.width < 960
         } action: { isNarrow in
