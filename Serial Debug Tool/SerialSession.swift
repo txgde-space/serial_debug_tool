@@ -440,7 +440,8 @@ final class SerialSession {
     private func scheduleFlush() {
         guard flushTask == nil else { return }
         flushTask = Task { [weak self] in
-            do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
+            // Coalesce serial reads to about 30 display updates per second.
+            do { try await Task.sleep(for: .milliseconds(33)) } catch { return }
             self?.flush()
         }
     }
@@ -484,10 +485,13 @@ final class SerialSession {
         }
         // Keep the UI bounded under continuous telemetry; counters continue counting all bytes.
         var removedCount = 0
-        while entries.count - removedCount > 1500 || storageBytes > 512_000 {
-            let removed = entries[removedCount]
-            storageBytes -= removed.data.count + removed.text.utf8.count
-            removedCount += 1
+        if entries.count > 1500 || storageBytes > 512_000 {
+            // Leave headroom so the text view does not reflow its prefix on every packet.
+            while entries.count - removedCount > 1200 || storageBytes > 384_000 {
+                let removed = entries[removedCount]
+                storageBytes -= removed.data.count + removed.text.utf8.count
+                removedCount += 1
+            }
         }
         let removedEntryIDs = entries.prefix(removedCount).map(\.id)
         if removedCount > 0 {
@@ -587,10 +591,12 @@ final class SerialSession {
                     self.processedEntries.append(contentsOf: processed)
                     self.processedBytes += processed.reduce(0) { $0 + $1.data.count + $1.text.utf8.count }
                     var removed = 0
-                    while self.processedEntries.count - removed > 1500 || self.processedBytes > 512_000 {
-                        let entry = self.processedEntries[removed]
-                        self.processedBytes -= entry.data.count + entry.text.utf8.count
-                        removed += 1
+                    if self.processedEntries.count > 1500 || self.processedBytes > 512_000 {
+                        while self.processedEntries.count - removed > 1200 || self.processedBytes > 384_000 {
+                            let entry = self.processedEntries[removed]
+                            self.processedBytes -= entry.data.count + entry.text.utf8.count
+                            removed += 1
+                        }
                     }
                     if removed > 0 {
                         self.processedEntries.removeFirst(removed)

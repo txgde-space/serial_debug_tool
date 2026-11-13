@@ -93,7 +93,16 @@ private struct TerminalTextView: NSViewRepresentable {
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
-        let view = NSTextView(frame: scroll.bounds)
+        // Use TextKit 1 explicitly for the character-based viewport anchors below.
+        let storage = NSTextStorage()
+        let layout = NSLayoutManager()
+        layout.allowsNonContiguousLayout = true
+        storage.addLayoutManager(layout)
+        let container = NSTextContainer(size: NSSize(
+            width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude
+        ))
+        layout.addTextContainer(container)
+        let view = NSTextView(frame: scroll.bounds, textContainer: container)
         view.isEditable = false
         view.isSelectable = true
         view.setAccessibilityLabel(AppText.outputLog)
@@ -105,7 +114,7 @@ private struct TerminalTextView: NSViewRepresentable {
         view.isVerticallyResizable = true
         view.isHorizontallyResizable = true
         view.autoresizingMask = [.width]
-        view.minSize = .zero
+        view.minSize = NSSize(width: 0, height: scroll.contentSize.height)
         view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         view.textContainer?.containerSize = view.maxSize
         view.textContainer?.widthTracksTextView = false
@@ -145,12 +154,16 @@ private struct TerminalTextView: NSViewRepresentable {
             coordinator.isUpdating = false
             coordinator.reportPosition(in: scroll)
         }
+        coordinator.updateDocumentFrame(in: scroll)
         let visible = scroll.contentView.bounds.origin
         let selection = view.selectedRange()
         // Clear the entire storage rather than deleting a prefix sized for the previous format.
         let incremental = changed && !text.isEmpty && coordinator.revision.map { $0 + 1 == update.revision } == true
             && update.removedPrefixUTF16 + update.removedSuffixUTF16 <= storage.length
         var anchor = scrollToEnd ? nil : ViewportAnchor(view: view, visibleY: visible.y)
+        // Following can skip off-screen layout. Reading history needs exact line positions
+        // so trimming older paragraphs cannot shift the visual anchor.
+        view.layoutManager?.allowsNonContiguousLayout = scrollToEnd
         if changed, var saved = anchor {
             if incremental {
                 let retainedLength = storage.length - update.removedPrefixUTF16 - update.removedSuffixUTF16
@@ -203,9 +216,8 @@ private struct TerminalTextView: NSViewRepresentable {
             view.setSelectedRange(NSRange(location: start, length: length))
         }
 
-        if let container = view.textContainer {
-            view.layoutManager?.ensureLayout(for: container)
-        }
+        // AppKit lays out the visible range on demand; forcing the entire container here
+        // stalls scrolling whenever the rolling buffer removes old lines.
         if scrollToEnd {
             coordinator.isFollowing = true
             coordinator.scrollToLatest(in: scroll)
@@ -223,7 +235,9 @@ private struct TerminalTextView: NSViewRepresentable {
         scroll.hasHorizontalScroller = !wrapLines
         view.isHorizontallyResizable = !wrapLines
         view.textContainer?.widthTracksTextView = false
+        view.minSize = NSSize(width: 0, height: scroll.contentSize.height)
         view.setFrameSize(NSSize(width: scroll.contentSize.width, height: max(view.frame.height, scroll.contentSize.height)))
+        view.setFrameOrigin(.zero)
         let width = wrapLines
             ? max(1, scroll.contentSize.width - view.textContainerInset.width * 2)
             : CGFloat.greatestFiniteMagnitude
@@ -241,6 +255,7 @@ private struct TerminalTextView: NSViewRepresentable {
             guard let layout = view.layoutManager, let container = view.textContainer,
                   view.textStorage?.length ?? 0 > 0 else { return nil }
             let point = NSPoint(x: 0, y: max(0, visibleY - view.textContainerOrigin.y))
+            layout.ensureLayout(forBoundingRect: NSRect(origin: point, size: view.visibleRect.size), in: container)
             let glyph = layout.glyphIndex(for: point, in: container)
             guard glyph < layout.numberOfGlyphs else { return nil }
             var lineRange = NSRange()
@@ -265,7 +280,10 @@ private struct TerminalTextView: NSViewRepresentable {
         func restoredY(in view: NSTextView) -> CGFloat? {
             guard let layout = view.layoutManager, let storage = view.textStorage,
                   storage.length > 0 else { return nil }
-            let glyph = layout.glyphIndexForCharacter(at: min(character, storage.length - 1))
+            let position = min(character, storage.length - 1)
+            let paragraph = (storage.string as NSString).paragraphRange(for: NSRange(location: position, length: 1))
+            layout.ensureLayout(forCharacterRange: paragraph)
+            let glyph = layout.glyphIndexForCharacter(at: position)
             let rect = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
             return max(0, rect.minY + view.textContainerOrigin.y + offsetY)
         }
@@ -304,6 +322,11 @@ private struct TerminalTextView: NSViewRepresentable {
                   let scroll = clip.enclosingScrollView else { return }
             let resized = viewportSize != clip.bounds.size
             viewportSize = clip.bounds.size
+            if resized {
+                isUpdating = true
+                updateDocumentFrame(in: scroll)
+                isUpdating = false
+            }
             if resized, autoScroll, isFollowing {
                 // Resizing a following window is not a request to read history.
                 isUpdating = true
@@ -311,14 +334,32 @@ private struct TerminalTextView: NSViewRepresentable {
                 isUpdating = false
             } else {
                 isFollowing = isAtBottom(in: scroll)
+                if !isFollowing, let view = scroll.documentView as? NSTextView {
+                    // Resolve exact positions before the user starts reading a historical line.
+                    view.layoutManager?.allowsNonContiguousLayout = false
+                }
             }
             reportPosition(in: scroll)
+        }
+
+        func updateDocumentFrame(in scroll: NSScrollView) {
+            guard let view = scroll.documentView as? NSTextView else { return }
+            let height = scroll.contentSize.height
+            if view.minSize.height != height {
+                view.minSize = NSSize(width: 0, height: height)
+            }
+            if view.frame.height < height {
+                view.setFrameSize(NSSize(width: view.frame.width, height: height))
+            }
+            // AppKit may center a short document before its first layout pass.
+            // A terminal always starts at the top, with bounds matching scroll coordinates.
+            if view.frame.origin != .zero { view.setFrameOrigin(.zero) }
         }
 
         func scrollToLatest(in scroll: NSScrollView) {
             guard let view = scroll.documentView as? NSTextView else { return }
             let x = scroll.contentView.bounds.minX
-            view.scrollRangeToVisible(NSRange(location: view.string.utf16.count, length: 0))
+            view.scrollRangeToVisible(NSRange(location: view.textStorage?.length ?? 0, length: 0))
             // The insertion point may be visible before the bottom text inset is visible.
             // Align the actual document bottom and retain horizontal position in HEX/no-wrap.
             scroll.contentView.scroll(to: NSPoint(
