@@ -114,7 +114,7 @@ final class SSHPasswordBroker: @unchecked Sendable {
             guard client >= 0 else { return }
             DispatchQueue.global(qos: .userInitiated).async {
                 defer { Darwin.close(client) }
-                Self.configure(client)
+                do { try Self.configure(client) } catch { return }
                 var uid: uid_t = 0, gid: gid_t = 0
                 guard getpeereid(client, &uid, &gid) == 0, uid == geteuid() else { return }
                 var request = [UInt8](repeating: 0, count: expected.count)
@@ -139,7 +139,7 @@ final class SSHPasswordBroker: @unchecked Sendable {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw systemError() }
         defer { Darwin.close(fd) }
-        configure(fd)
+        try configure(fd)
         try withAddress(path) { address, size in
             guard connect(fd, address, size) == 0 else { throw systemError() }
         }
@@ -161,7 +161,11 @@ final class SSHPasswordBroker: @unchecked Sendable {
         return value
     }
 
-    private static func configure(_ fd: Int32) {
+    private static func configure(_ fd: Int32) throws {
+        // Darwin inherits O_NONBLOCK from the listener. Wait for the helper's
+        // capability instead of treating a scheduling delay as authentication failure.
+        let flags = fcntl(fd, F_GETFL)
+        guard flags >= 0, fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) == 0 else { throw systemError() }
         var timeout = timeval(tv_sec: 2, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
         setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
