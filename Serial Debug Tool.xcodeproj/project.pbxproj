@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A7C010000000000000000001 /* SSHKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C010000000000000000002 /* SSHKeychain.swift */; };
 		000000000000000150000001 /* ReceiveScriptWorker in Copy Helpers */ = {isa = PBXBuildFile; fileRef = C103965F3093A49F00AA98CC /* ReceiveScriptWorker */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -41,6 +42,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A7C010000000000000000002 /* SSHKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Serial Debug Tool/SSHKeychain.swift"; sourceTree = SOURCE_ROOT; };
 		000000000000000000000120 /* Serial Debug Tool.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Serial Debug Tool.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C103965F3093A49F00AA98CC /* ReceiveScriptWorker */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ReceiveScriptWorker; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -189,6 +191,7 @@
 		C103965B3093A49F00AA98CC /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				A7C010000000000000000001 /* SSHKeychain.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */

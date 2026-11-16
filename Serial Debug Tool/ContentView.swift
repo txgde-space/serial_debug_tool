@@ -253,25 +253,35 @@ struct ContentView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         sectionTitle(AppText.connectionSettings, icon: "slider.horizontal.3")
+                        Picker(AppText.sshConnectionMode, selection: $session.connectionMode) {
+                            ForEach(SerialConnectionMode.allCases, id: \.self) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        if session.connectionMode == .ssh {
+                            SSHConnectionControls(session: session)
+                        }
                         HStack {
-                            Text(AppText.device).font(.caption).foregroundStyle(.secondary)
+                            Text(session.connectionMode == .ssh ? AppText.sshRemoteDevice : AppText.device).font(.caption).foregroundStyle(.secondary)
                             Spacer()
                             Button {
                                 Task { await session.refreshPorts() }
                             } label: { Image(systemName: "arrow.clockwise") }
                                 .buttonStyle(.borderless)
-                                .accessibilityLabel(AppText.rescanPorts)
-                                .help(AppText.rescanPorts)
+                                .accessibilityLabel(session.connectionMode == .ssh ? AppText.sshScan : AppText.rescanPorts)
+                                .help(session.connectionMode == .ssh ? AppText.sshScan : AppText.rescanPorts)
                         }
-                        SerialDevicePicker(ports: session.ports, path: $session.selectedPath)
+                        SerialDevicePicker(ports: session.connectionMode == .ssh ? session.remotePorts : session.ports, path: devicePathBinding)
                             .frame(maxWidth: .infinity)
-                        TextField(AppText.devicePathPlaceholder, text: $session.selectedPath)
+                        TextField(session.connectionMode == .ssh ? AppText.sshRemotePath : AppText.devicePathPlaceholder, text: devicePathBinding)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(.caption, design: .monospaced))
                             .accessibilityLabel(AppText.devicePath)
                             .help(AppText.devicePathHelp)
-                        if session.ports.isEmpty {
-                            Label(AppText.noDevices, systemImage: "info.circle")
+                        if (session.connectionMode == .ssh ? session.remotePorts : session.ports).isEmpty {
+                            Label(session.connectionMode == .ssh ? AppText.sshNoPorts : AppText.noDevices, systemImage: "info.circle")
                                 .font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -279,7 +289,7 @@ struct ContentView: View {
                         Divider().padding(.vertical, 2)
                         connectionParameters
                     }
-                    .disabled(session.isConnected || session.isConnecting)
+                    .disabled(session.isConnected || session.isConnecting || session.isScanning)
                 }
                 .padding(16)
             }
@@ -363,20 +373,25 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
     }
 
+    private var devicePathBinding: Binding<String> {
+        Binding(get: { session.connectionMode == .ssh ? session.remotePath : session.selectedPath },
+                set: { if session.connectionMode == .ssh { session.remotePath = $0 } else { session.selectedPath = $0 } })
+    }
+
     private var connectionButton: some View {
         Button {
             Task {
-                if session.isConnected { await session.disconnect() }
+                if session.isConnected || session.isConnecting || session.isScanning { await session.disconnect() }
                 else { await session.connect() }
             }
         } label: {
             HStack {
-                if session.isConnecting {
+                if session.isConnecting || session.isScanning {
                     ProgressView().controlSize(.small)
                 } else {
                     Image(systemName: session.isConnected ? "stop.fill" : "bolt.fill")
                 }
-                Text(session.isConnected ? AppText.disconnect : session.isConnecting ? AppText.connecting : AppText.connect)
+                Text(session.isConnected ? AppText.disconnect : (session.isConnecting || session.isScanning) ? AppText.cancel : AppText.connect)
                     .contentTransition(.opacity)
             }
             .frame(maxWidth: .infinity)
@@ -386,7 +401,7 @@ struct ContentView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(session.isConnected ? .red : .accentColor)
-        .disabled(session.isConnecting || session.selectedPath.isEmpty)
+        .disabled(!session.isConnected && !session.isConnecting && !session.isScanning && devicePathBinding.wrappedValue.isEmpty)
         .keyboardShortcut("o", modifiers: .command)
     }
 
@@ -1012,6 +1027,17 @@ struct ConnectionStatusView: View {
 
 #if DEBUG
 extension ContentView {
+    fileprivate static func sshPreview() -> ContentView {
+        let session = SerialSession()
+        session.connectionMode = .ssh
+        session.sshHost = "192.168.1.100"
+        session.sshUsername = "pi"
+        session.remotePath = "/dev/ttyUSB0"
+        var view = ContentView()
+        view._session = State(initialValue: session)
+        return view
+    }
+
     fileprivate static func presetCommandsPreview() -> ContentView {
         var view = ContentView()
         view._sendMode = State(initialValue: .presets)
@@ -1022,6 +1048,11 @@ extension ContentView {
 #Preview("预设面板 · 窄窗口") {
     ContentView.presetCommandsPreview()
         .frame(width: 700, height: 640)
+}
+
+#Preview("SSH 远程串口") {
+    ContentView.sshPreview()
+        .frame(width: 1120, height: 780)
 }
 
 #Preview("常规窗口 · 预设面板") {

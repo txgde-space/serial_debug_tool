@@ -1,4 +1,29 @@
 /* App-owned interface text. Keep keys stable across releases. */
+"connection.local" = "Local";
+"connection.ssh" = "SSH Remote";
+"ssh.host" = "Host";
+"ssh.port" = "SSH Port";
+"ssh.user" = "Username";
+"ssh.auth" = "Authentication";
+"ssh.password" = "Password";
+"ssh.key" = "Private Key";
+"ssh.chooseKey" = "Choose Private Key…";
+"ssh.invalidKey" = "Choose an OpenSSH or PEM private-key file.";
+"ssh.invalidConfig" = "Enter a valid host, username, and SSH port (1–65535).";
+"ssh.invalidResponse" = "The remote serial bridge returned invalid data.";
+"ssh.timeout" = "SSH connection timed out.";
+"ssh.disconnected" = "The SSH connection or remote serial device was disconnected.";
+"ssh.trustHost" = "Verify SSH Host";
+"ssh.trust" = "Trust and Connect";
+"ssh.authenticate" = "SSH Authentication";
+"ssh.secret" = "Password or key passphrase";
+"ssh.scan" = "Scan Remote Ports";
+"ssh.scanning" = "Scanning remote ports…";
+"ssh.device" = "Remote Device";
+"ssh.path" = "/dev/ttyUSB0";
+"ssh.noPorts" = "No remote serial ports found. Enter a device path manually.";
+"ssh.mode" = "Connection Type";
+"ssh.failure" = "Remote connection: %1$@";
 "updates.close" = "Close";
 "updates.whatsNew" = "What's New";
 "updates.notesUnavailable" = "Release notes are unavailable. Open the download page to view the changes.";
@@ -229,3 +254,31 @@
 /* Local script files */
 "script.import" = "Import…";
 "script.import.encoding" = "Choose a UTF-8 JavaScript or text file.";
+
+"ssh.testConnection" = "Test SSH Connection";
+"ssh.support.unchecked" = "Serial support not checked";
+"ssh.support.checking" = "Checking SSH serial support…";
+"ssh.support.supported" = "Remote serial supported";
+"ssh.support.unsupported" = "Remote serial not supported";
+"ssh.support.failed" = "SSH check incomplete";
+"ssh.support.verified" = "Serial connection verified";
+"ssh.support.deviceFailed" = "Serial device check failed";
+"ssh.support.scope" = "Checks required tools and the lock directory. Device access and serial settings are verified when connecting; no test bytes are sent.";
+"ssh.support.temp" = "Cannot create or remove a serial lock directory under /tmp. Check permissions and available space.";
+"ssh.support.missingTools" = "Missing remote commands: %@";
+"ssh.support.unusableTools" = "Remote commands cannot run correctly: %@";
+
+"ssh.sessions" = "Sessions";
+"ssh.session.manual" = "New Connection";
+"ssh.session.new" = "New Session";
+"ssh.session.save" = "Save Host";
+"ssh.session.name" = "Remark";
+"ssh.session.delete" = "Delete Session?";
+"ssh.session.deleteDetail" = "The saved session and its password will be deleted.";
+"ssh.session.passwordPlaceholder" = "Leave blank to keep the saved password";
+"ssh.session.forgetPassword" = "Remove Saved Password";
+"ssh.session.forgetDetail" = "The next connection will ask for a password.";
+"ssh.keychain.error" = "Unable to access the SSH password in Keychain.";
+"ssh.session.busy" = "A session is being saved. Try again shortly.";
+
+"ssh.hosts.manage" = "Manage Hosts";

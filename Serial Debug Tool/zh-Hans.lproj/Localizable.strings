@@ -1,4 +1,29 @@
 /* App-owned interface text. Keep keys stable across releases. */
+"connection.local" = "本地串口";
+"connection.ssh" = "SSH 远程";
+"ssh.host" = "主机";
+"ssh.port" = "SSH 端口";
+"ssh.user" = "用户名";
+"ssh.auth" = "认证方式";
+"ssh.password" = "密码";
+"ssh.key" = "私钥";
+"ssh.chooseKey" = "选择私钥…";
+"ssh.invalidKey" = "请选择 OpenSSH 或 PEM 格式的私钥文件。";
+"ssh.invalidConfig" = "请填写有效的主机、用户名和 SSH 端口（1–65535）。";
+"ssh.invalidResponse" = "远程串口桥接程序返回了异常数据。";
+"ssh.timeout" = "SSH 连接超时。";
+"ssh.disconnected" = "SSH 连接或远程串口已断开。";
+"ssh.trustHost" = "确认 SSH 主机";
+"ssh.trust" = "信任并连接";
+"ssh.authenticate" = "SSH 认证";
+"ssh.secret" = "密码或私钥口令";
+"ssh.scan" = "扫描远程串口";
+"ssh.scanning" = "正在扫描远程串口…";
+"ssh.device" = "远程设备";
+"ssh.path" = "/dev/ttyUSB0";
+"ssh.noPorts" = "未找到远程串口，可手动填写设备路径。";
+"ssh.mode" = "连接方式";
+"ssh.failure" = "远程连接：%1$@";
 "updates.close" = "关闭";
 "updates.whatsNew" = "更新内容";
 "updates.notesUnavailable" = "暂时无法获取更新说明，请打开下载页面查看本次更新内容。";
@@ -229,3 +254,31 @@
 /* Local script files */
 "script.import" = "导入…";
 "script.import.encoding" = "请选择 UTF-8 编码的 JavaScript 或文本文件。";
+
+"ssh.testConnection" = "测试 SSH 连接";
+"ssh.support.unchecked" = "未检测串口支持";
+"ssh.support.checking" = "正在检测串口支持…";
+"ssh.support.supported" = "环境支持串口调试";
+"ssh.support.unsupported" = "不支持远程串口调试";
+"ssh.support.failed" = "SSH 检测未完成";
+"ssh.support.verified" = "串口连接验证通过";
+"ssh.support.deviceFailed" = "串口连接验证失败";
+"ssh.support.scope" = "检测基础工具和锁目录；连接时验证串口权限及参数，不发送测试数据。";
+"ssh.support.temp" = "无法在 /tmp 中创建或删除串口锁目录，请检查权限和可用空间。";
+"ssh.support.missingTools" = "远端缺少命令：%@";
+"ssh.support.unusableTools" = "远端命令无法正常运行：%@";
+
+"ssh.sessions" = "会话";
+"ssh.session.manual" = "新建连接";
+"ssh.session.new" = "新建会话";
+"ssh.session.save" = "保存当前主机";
+"ssh.session.name" = "备注";
+"ssh.session.delete" = "删除会话？";
+"ssh.session.deleteDetail" = "将删除此会话及其保存的密码。";
+"ssh.session.passwordPlaceholder" = "留空保留已保存的密码";
+"ssh.session.forgetPassword" = "移除已保存密码";
+"ssh.session.forgetDetail" = "下次连接时将重新询问密码。";
+"ssh.keychain.error" = "无法访问钥匙串中的 SSH 密码。";
+"ssh.session.busy" = "正在保存会话，请稍后重试。";
+
+"ssh.hosts.manage" = "管理主机";

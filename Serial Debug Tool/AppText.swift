@@ -2,6 +2,206 @@ import Foundation
 
 /// All app-owned user-facing text. Keep protocol identifiers and persisted enum values unchanged.
 enum AppText {
+    static var sshManageHosts: String {
+        String(localized: "ssh.hosts.manage", defaultValue: "Manage Hosts", bundle: bundle, locale: locale)
+    }
+
+    static var sshSessions: String {
+        String(localized: "ssh.sessions", defaultValue: "Sessions", bundle: bundle, locale: locale)
+    }
+
+    static var sshManualSession: String {
+        String(localized: "ssh.session.manual", defaultValue: "New Connection", bundle: bundle, locale: locale)
+    }
+
+    static var sshNewSession: String {
+        String(localized: "ssh.session.new", defaultValue: "New Session", bundle: bundle, locale: locale)
+    }
+
+    static var sshSaveSession: String {
+        String(localized: "ssh.session.save", defaultValue: "Save Host", bundle: bundle, locale: locale)
+    }
+
+    static var sshSessionName: String {
+        String(localized: "ssh.session.name", defaultValue: "Remark", bundle: bundle, locale: locale)
+    }
+
+    static var sshDeleteSession: String {
+        String(localized: "ssh.session.delete", defaultValue: "Delete Session?", bundle: bundle, locale: locale)
+    }
+
+    static var sshDeleteSessionDetail: String {
+        String(localized: "ssh.session.deleteDetail", defaultValue: "The saved session and its password will be deleted.", bundle: bundle, locale: locale)
+    }
+
+    static var sshSavedPasswordPlaceholder: String {
+        String(localized: "ssh.session.passwordPlaceholder", defaultValue: "Leave blank to keep the saved password", bundle: bundle, locale: locale)
+    }
+
+    static var sshForgetPassword: String {
+        String(localized: "ssh.session.forgetPassword", defaultValue: "Remove Saved Password", bundle: bundle, locale: locale)
+    }
+
+    static var sshForgetPasswordDetail: String {
+        String(localized: "ssh.session.forgetDetail", defaultValue: "The next connection will ask for a password.", bundle: bundle, locale: locale)
+    }
+
+    static var sshKeychainError: String {
+        String(localized: "ssh.keychain.error", defaultValue: "Unable to access the SSH password in Keychain.", bundle: bundle, locale: locale)
+    }
+
+    static var sshSessionBusy: String {
+        String(localized: "ssh.session.busy", defaultValue: "A session is being saved. Try again shortly.", bundle: bundle, locale: locale)
+    }
+
+    static var localSerial: String {
+        String(localized: "connection.local", defaultValue: "Local", bundle: bundle, locale: locale)
+    }
+
+    static var sshSerial: String {
+        String(localized: "connection.ssh", defaultValue: "SSH Remote", bundle: bundle, locale: locale)
+    }
+
+    static var sshHost: String {
+        String(localized: "ssh.host", defaultValue: "Host", bundle: bundle, locale: locale)
+    }
+
+    static var sshPort: String {
+        String(localized: "ssh.port", defaultValue: "SSH Port", bundle: bundle, locale: locale)
+    }
+
+    static var sshUsername: String {
+        String(localized: "ssh.user", defaultValue: "Username", bundle: bundle, locale: locale)
+    }
+
+    static var sshAuthentication: String {
+        String(localized: "ssh.auth", defaultValue: "Authentication", bundle: bundle, locale: locale)
+    }
+
+    static var sshPassword: String {
+        String(localized: "ssh.password", defaultValue: "Password", bundle: bundle, locale: locale)
+    }
+
+    static var sshPrivateKey: String {
+        String(localized: "ssh.key", defaultValue: "Private Key", bundle: bundle, locale: locale)
+    }
+
+    static var sshChooseKey: String {
+        String(localized: "ssh.chooseKey", defaultValue: "Choose Private Key…", bundle: bundle, locale: locale)
+    }
+
+    static var sshInvalidKey: String {
+        String(localized: "ssh.invalidKey", defaultValue: "Choose an OpenSSH or PEM private-key file.", bundle: bundle, locale: locale)
+    }
+
+    static var sshInvalidConfiguration: String {
+        String(localized: "ssh.invalidConfig", defaultValue: "Enter a valid host, username, and SSH port (1–65535).", bundle: bundle, locale: locale)
+    }
+
+    static var sshInvalidResponse: String {
+        String(localized: "ssh.invalidResponse", defaultValue: "The remote serial bridge returned invalid data.", bundle: bundle, locale: locale)
+    }
+
+    static var sshConnectionTimeout: String {
+        String(localized: "ssh.timeout", defaultValue: "SSH connection timed out.", bundle: bundle, locale: locale)
+    }
+
+    static var sshDisconnected: String {
+        String(localized: "ssh.disconnected", defaultValue: "The SSH connection or remote serial device was disconnected.", bundle: bundle, locale: locale)
+    }
+
+    static var sshTrustHost: String {
+        String(localized: "ssh.trustHost", defaultValue: "Verify SSH Host", bundle: bundle, locale: locale)
+    }
+
+    static var sshTrust: String {
+        String(localized: "ssh.trust", defaultValue: "Trust and Connect", bundle: bundle, locale: locale)
+    }
+
+    static var sshAuthenticate: String {
+        String(localized: "ssh.authenticate", defaultValue: "SSH Authentication", bundle: bundle, locale: locale)
+    }
+
+    static var sshSecret: String {
+        String(localized: "ssh.secret", defaultValue: "Password or key passphrase", bundle: bundle, locale: locale)
+    }
+
+    static var sshScan: String {
+        String(localized: "ssh.scan", defaultValue: "Scan Remote Ports", bundle: bundle, locale: locale)
+    }
+
+    static var sshScanning: String {
+        String(localized: "ssh.scanning", defaultValue: "Scanning remote ports…", bundle: bundle, locale: locale)
+    }
+
+    static var sshRemoteDevice: String {
+        String(localized: "ssh.device", defaultValue: "Remote Device", bundle: bundle, locale: locale)
+    }
+
+    static var sshRemotePath: String {
+        String(localized: "ssh.path", defaultValue: "/dev/ttyUSB0", bundle: bundle, locale: locale)
+    }
+
+    static var sshNoPorts: String {
+        String(localized: "ssh.noPorts", defaultValue: "No remote serial ports found. Enter a device path manually.", bundle: bundle, locale: locale)
+    }
+
+    static var sshConnectionMode: String {
+        String(localized: "ssh.mode", defaultValue: "Connection Type", bundle: bundle, locale: locale)
+    }
+
+    static func sshFailure(_ detail: String) -> String {
+        String(localized: "ssh.failure", defaultValue: "Remote connection: \(detail)", bundle: bundle, locale: locale)
+    }
+
+    static var sshTestConnection: String {
+        String(localized: "ssh.testConnection", defaultValue: "Test SSH Connection", bundle: bundle, locale: locale)
+    }
+
+    static var sshSupportUnchecked: String {
+        String(localized: "ssh.support.unchecked", defaultValue: "Serial support not checked", bundle: bundle, locale: locale)
+    }
+
+    static var sshSupportChecking: String {
+        String(localized: "ssh.support.checking", defaultValue: "Checking SSH serial support…", bundle: bundle, locale: locale)
+    }
+
+    static var sshSupported: String {
+        String(localized: "ssh.support.supported", defaultValue: "Remote serial supported", bundle: bundle, locale: locale)
+    }
+
+    static var sshUnsupported: String {
+        String(localized: "ssh.support.unsupported", defaultValue: "Remote serial not supported", bundle: bundle, locale: locale)
+    }
+
+    static var sshSupportFailed: String {
+        String(localized: "ssh.support.failed", defaultValue: "SSH check incomplete", bundle: bundle, locale: locale)
+    }
+
+    static var sshSerialVerified: String {
+        String(localized: "ssh.support.verified", defaultValue: "Serial connection verified", bundle: bundle, locale: locale)
+    }
+
+    static var sshDeviceCheckFailed: String {
+        String(localized: "ssh.support.deviceFailed", defaultValue: "Serial device check failed", bundle: bundle, locale: locale)
+    }
+
+    static var sshSupportScope: String {
+        String(localized: "ssh.support.scope", defaultValue: "Checks required tools and the lock directory. Device access and serial settings are verified when connecting; no test bytes are sent.", bundle: bundle, locale: locale)
+    }
+
+    static var sshTemporaryDirectoryUnavailable: String {
+        String(localized: "ssh.support.temp", defaultValue: "Cannot create or remove a serial lock directory under /tmp. Check permissions and available space.", bundle: bundle, locale: locale)
+    }
+
+    static func sshMissingTools(_ tools: String) -> String {
+        String(localized: "ssh.support.missingTools", defaultValue: "Missing remote commands: \(tools)", bundle: bundle, locale: locale)
+    }
+
+    static func sshUnusableTools(_ tools: String) -> String {
+        String(localized: "ssh.support.unusableTools", defaultValue: "Remote commands cannot run correctly: \(tools)", bundle: bundle, locale: locale)
+    }
+
     static var updateClose: String {
         String(localized: "updates.close", defaultValue: "Close", bundle: bundle, locale: locale)
     }

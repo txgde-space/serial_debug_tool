@@ -1,5 +1,6 @@
 import Foundation
 import JavaScriptCore
+import AppKit
 
 enum ReceiveScriptFailure: Error, Sendable, Codable {
     case invalidFunction
@@ -81,4 +82,63 @@ enum ReceiveScriptWorker {
 }
 
 
-ReceiveScriptWorker.run()
+
+/// Authentication runs in a separate invocation of the sandbox-inheriting helper.
+/// JavaScript receives no Keychain or AppKit bindings.
+@MainActor
+enum SSHAuthenticationPrompt {
+    static func run() -> Never {
+        let environment = ProcessInfo.processInfo.environment
+        let prompt = String((CommandLine.arguments.dropFirst().first ?? "").prefix(4096))
+        let kind = environment["SSH_ASKPASS_PROMPT"]
+        let confirming = kind == "confirm" || prompt.contains("yes/no")
+        let notice = kind == "none"
+        if !confirming, SSHKeychain.isPasswordPrompt(prompt, kind: kind),
+           let account = environment["SERIAL_DEBUG_SSH_PASSWORD_ACCOUNT"],
+           let password = try? SSHKeychain().password(account: account),
+           !password.contains(where: { $0 == "\n" || $0 == "\r" || $0 == "\0" }) {
+            FileHandle.standardOutput.write(Data((password + "\n").utf8))
+            Darwin.exit(0)
+        }
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        switch environment["SERIAL_DEBUG_SSH_THEME"] {
+        case "dark": app.appearance = NSAppearance(named: .darkAqua)
+        case "light": app.appearance = NSAppearance(named: .aqua)
+        default: break
+        }
+        let labels = environment["SERIAL_DEBUG_SSH_LABELS"].flatMap { $0.data(using: .utf8) }
+            .flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
+        let alert = NSAlert()
+        alert.messageText = confirming ? labels["trustHost"] ?? "Trust SSH Host?" : labels["authenticate"] ?? "SSH Authentication"
+        alert.informativeText = (environment["SERIAL_DEBUG_SSH_CONTEXT"] ?? "") + "\n\n" + prompt
+        alert.icon = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
+        alert.addButton(withTitle: confirming ? labels["trust"] ?? "Trust" : labels["confirm"] ?? "OK")
+        alert.addButton(withTitle: labels["cancel"] ?? "Cancel")
+        let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        if !confirming && !notice {
+            field.placeholderString = labels["secret"] ?? "Password"
+            alert.accessoryView = field
+        }
+        let parent = getppid()
+        let timer = Timer(timeInterval: 0.5, repeats: true) { _ in
+            if getppid() != parent || kill(parent, 0) != 0 { Darwin.exit(1) }
+        }
+        RunLoop.main.add(timer, forMode: RunLoop.Mode("NSModalPanelRunLoopMode"))
+        app.activate(ignoringOtherApps: true)
+        if !confirming && !notice { alert.window.initialFirstResponder = field }
+        let response = alert.runModal()
+        timer.invalidate()
+        guard response == .alertFirstButtonReturn else { Darwin.exit(1) }
+        let answer = confirming ? "yes" : notice ? "" : field.stringValue
+        guard !answer.contains(where: { $0 == "\n" || $0 == "\r" || $0 == "\0" }) else { Darwin.exit(1) }
+        FileHandle.standardOutput.write(Data((answer + "\n").utf8))
+        Darwin.exit(0)
+    }
+}
+
+if ProcessInfo.processInfo.environment["SERIAL_DEBUG_SSH_ASKPASS"] == "1" {
+    MainActor.assumeIsolated { SSHAuthenticationPrompt.run() }
+} else {
+    ReceiveScriptWorker.run()
+}

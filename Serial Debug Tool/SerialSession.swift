@@ -4,6 +4,18 @@ import Observation
 @MainActor
 @Observable
 final class SerialSession {
+    var connectionMode: SerialConnectionMode = .local
+    var sshHost = "" { didSet { if sshHost != oldValue { invalidateSSHSupport() } } }
+    var sshPort = "22" { didSet { if sshPort != oldValue { invalidateSSHSupport() } } }
+    var sshUsername = "" { didSet { if sshUsername != oldValue { invalidateSSHSupport() } } }
+    var sshAuthentication: SSHAuthentication = .password { didSet { if sshAuthentication != oldValue { invalidateSSHSupport() } } }
+    private(set) var sshIdentityURL: URL?
+    private(set) var sshKeyName = ""
+    var remotePath = "" { didSet { if remotePath != oldValue { sshDeviceError = nil } } }
+    private(set) var sshSupportStatus: SSHSupportStatus = .unchecked
+    private(set) var sshDeviceError: String?
+    private(set) var remotePorts: [SerialPort] = []
+    private(set) var isScanning = false
     var ports: [SerialPort] = []
     var selectedPath = ""
     var baudRate = "115200"
@@ -62,14 +74,24 @@ final class SerialSession {
     var interval = "1000"
     var errorMessage: String?
     var presets: [CommandPreset] { presetStore.presets }
+    var sshProfiles: [SSHProfile] { sshProfileStore.profiles }
+    var isSavingSSHProfile: Bool { sshProfileStore.isMutating }
+    private(set) var sshProfileID: UUID?
+    var selectedSSHProfile: SSHProfile? { sshProfiles.first { $0.id == sshProfileID } }
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let presetStore: CommandPresetStore
+    @ObservationIgnored private let sshProfileStore: SSHProfileStore
     @ObservationIgnored private var savedPath = ""
     @ObservationIgnored private var lastConnectedPath: String?
     @ObservationIgnored private var savedBaudRate = ""
     @ObservationIgnored private var repeatTaskID: UUID?
     @ObservationIgnored private let transport = SerialTransport()
+    @ObservationIgnored private let sshTransport: SSHSerialTransport
+    @ObservationIgnored private let sshScanner: SSHSerialTransport
+    @ObservationIgnored private var scanID = UUID()
+    @ObservationIgnored private var sshSettingsID = UUID()
+    @ObservationIgnored private var connectedRemotely = false
     @ObservationIgnored private var streamTask: Task<Void, Never>?
     @ObservationIgnored private var repeatTask: Task<Void, Never>?
     @ObservationIgnored private var sessionID = UUID()
@@ -97,19 +119,45 @@ final class SerialSession {
         return formatter
     }()
 
-    init(defaults: UserDefaults = .standard, presetStore: CommandPresetStore? = nil, scriptEngine: ReceiveScriptEngine = ReceiveScriptEngine(), sendScriptEngine: SendScriptEngine = SendScriptEngine()) {
+    init(defaults: UserDefaults = .standard, presetStore: CommandPresetStore? = nil, scriptEngine: ReceiveScriptEngine = ReceiveScriptEngine(), sendScriptEngine: SendScriptEngine = SendScriptEngine(), sshTransport: SSHSerialTransport? = nil, sshScanner: SSHSerialTransport? = nil, sshProfileStore: SSHProfileStore? = nil) {
+        self.sshTransport = sshTransport ?? SSHSerialTransport()
+        self.sshScanner = sshScanner ?? SSHSerialTransport()
         self.scriptEngine = scriptEngine
         self.sendScriptEngine = sendScriptEngine
         self.defaults = defaults
         self.presetStore = presetStore ?? .shared
+        self.sshProfileStore = sshProfileStore ?? .shared
         selectedPath = defaults.string(forKey: "serial.path") ?? ""
         baudRate = defaults.string(forKey: "serial.baud") ?? "115200"
+        sshHost = defaults.string(forKey: "ssh.host") ?? ""
+        sshPort = defaults.string(forKey: "ssh.port") ?? "22"
+        sshUsername = defaults.string(forKey: "ssh.username") ?? ""
+        remotePath = defaults.string(forKey: "ssh.device") ?? ""
+        sshAuthentication = SSHAuthentication(rawValue: defaults.string(forKey: "ssh.authentication") ?? "") ?? .password
+        if let name = defaults.string(forKey: "ssh.identity"), name.hasPrefix("identity-"), !name.contains("/") {
+            sshIdentityURL = try? SSHFiles.directory().appendingPathComponent(name)
+            sshKeyName = defaults.string(forKey: "ssh.keyName") ?? name
+        }
         savedPath = selectedPath
         savedBaudRate = baudRate
         scriptSource = defaults.string(forKey: "serial.receiveScript") ?? ReceiveScriptWorker.defaultSource
         activeScriptID = defaults.string(forKey: "serial.receiveScriptID").flatMap(UUID.init(uuidString:))
         sendScriptSource = defaults.string(forKey: "serial.sendScript") ?? SendScriptExample.defaultSource
         activeSendScriptID = defaults.string(forKey: "serial.sendScriptID").flatMap(UUID.init(uuidString:))
+        if let configuration = try? sshConfiguration() {
+            if let savedID = defaults.string(forKey: "ssh.profileID") {
+                // An empty identifier preserves an explicitly unsaved connection.
+                if let profile = self.sshProfileStore.profiles.first(where: {
+                    $0.id.uuidString == savedID && $0.matches(configuration)
+                }) {
+                    sshProfileID = profile.id
+                }
+            } else {
+                // Migrate settings saved before profile selection was persisted.
+                let matches = self.sshProfileStore.profiles.filter { $0.matches(configuration) }
+                if matches.count == 1 { sshProfileID = matches[0].id }
+            }
+        }
     }
 
     var configurationSummary: String {
@@ -118,53 +166,199 @@ final class SerialSession {
 
     func monitor() async {
         while !Task.isCancelled {
-            if !isConnected && !isConnecting { await refreshPorts() }
+            if connectionMode == .local && !isConnected && !isConnecting && !isScanning { await refreshPorts() }
             do { try await Task.sleep(for: .seconds(2)) } catch { break }
         }
         savePreferences()
         await disconnect()
     }
 
+    func newSSHProfile() {
+        guard !isConnected, !isConnecting, !isScanning else { return }
+        sshProfileID = nil
+        sshHost = ""
+        sshPort = "22"
+        sshUsername = ""
+        sshAuthentication = .password
+        sshIdentityURL = nil
+        sshKeyName = ""
+        remotePath = ""
+        invalidateSSHSupport()
+    }
+
+    func selectSSHProfile(_ id: UUID?) {
+        guard !isConnected, !isConnecting, !isScanning else { return }
+        guard let profile = sshProfiles.first(where: { $0.id == id }) else {
+            sshProfileID = nil
+            return
+        }
+        do {
+            let configuration = try profile.configuration()
+            try configuration.validate()
+            sshProfileID = profile.id
+            sshHost = profile.host
+            sshPort = String(profile.port)
+            sshUsername = profile.username
+            sshAuthentication = profile.authentication
+            sshIdentityURL = configuration.identityURL
+            sshKeyName = profile.keyName
+            remotePath = profile.device
+            baudRate = String(profile.baudRate)
+            dataBits = profile.dataBits
+            stopBits = profile.stopBits
+            parity = profile.parity
+            flowControl = profile.flowControl
+            invalidateSSHSupport()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func saveSSHProfile(name: String, password: String, asNew: Bool) async throws {
+        guard !isConnected, !isConnecting, !isScanning else {
+            throw SerialTransportError(message: AppText.disconnectFirst)
+        }
+        let configuration = try sshConfiguration()
+        guard let baud = Int(baudRate) else { throw SerialTransportError(message: AppText.invalidBaud) }
+        let profile = SSHProfile(
+            id: asNew ? UUID() : selectedSSHProfile?.id ?? UUID(),
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            host: configuration.host, port: configuration.port, username: configuration.username,
+            authentication: configuration.authentication, identityFile: sshIdentityURL?.lastPathComponent,
+            keyName: sshKeyName, device: remotePath, baudRate: baud, dataBits: dataBits,
+            stopBits: stopBits, parity: parity, flowControl: flowControl
+        )
+        try await sshProfileStore.save(profile, password: password)
+        sshProfileID = profile.id
+    }
+
+    func deleteSSHProfile() async throws {
+        guard let id = selectedSSHProfile?.id else { return }
+        try await sshProfileStore.remove(id: id)
+        if sshProfileID == id { sshProfileID = nil }
+    }
+
+    func forgetSSHPassword() async throws {
+        guard let id = selectedSSHProfile?.id else { return }
+        try await sshProfileStore.forgetPassword(id: id)
+    }
+
+    func importSSHIdentity(from url: URL) throws {
+        sshIdentityURL = try SSHFiles.importIdentity(from: url)
+        sshKeyName = url.lastPathComponent
+        invalidateSSHSupport()
+        defaults.set(sshIdentityURL?.lastPathComponent, forKey: "ssh.identity")
+        defaults.set(sshKeyName, forKey: "ssh.keyName")
+    }
+
+    private func invalidateSSHSupport() {
+        sshSettingsID = UUID()
+        sshSupportStatus = .unchecked
+        sshDeviceError = nil
+        remotePorts = []
+    }
+
+    private func setSSHSupport(_ report: SSHSupportReport?, error: Error? = nil) {
+        if let report {
+            sshSupportStatus = .checked(report)
+        } else if let error {
+            sshSupportStatus = .failed(error.localizedDescription)
+        } else {
+            sshSupportStatus = .unchecked
+        }
+    }
+
+    private func sshConfiguration() throws -> SSHConfiguration {
+        guard let port = Int(sshPort) else { throw SerialTransportError(message: AppText.sshInvalidConfiguration) }
+        var configuration = SSHConfiguration(host: sshHost.trimmingCharacters(in: .whitespacesAndNewlines),
+                                             port: port, username: sshUsername.trimmingCharacters(in: .whitespacesAndNewlines),
+                                             authentication: sshAuthentication, identityURL: sshIdentityURL)
+        try configuration.validate()
+        if configuration.authentication == .password, let profile = selectedSSHProfile, profile.matches(configuration) {
+            configuration.passwordAccount = profile.passwordAccount
+        }
+        return configuration
+    }
+
     func refreshPorts() async {
+        if connectionMode == .ssh {
+            guard !isConnected, !isConnecting, !isScanning else { return }
+            let token = UUID()
+            scanID = token
+            let settingsID = sshSettingsID
+            isScanning = true
+            sshSupportStatus = .checking
+            sshDeviceError = nil
+            defer { if scanID == token { isScanning = false } }
+            do {
+                let configuration = try sshConfiguration()
+                let discovered = try await sshScanner.scan(configuration, generation: token)
+                let report = await sshScanner.checkedSupport(for: token)
+                guard scanID == token, sshSettingsID == settingsID, !Task.isCancelled else { return }
+                setSSHSupport(report)
+                remotePorts = discovered
+                if remotePath.isEmpty { remotePath = discovered.first?.path ?? "" }
+                savePreferences(force: true)
+            } catch {
+                let report = await sshScanner.checkedSupport(for: token)
+                guard scanID == token, sshSettingsID == settingsID, !Task.isCancelled else { return }
+                setSSHSupport(report, error: error)
+                errorMessage = error.localizedDescription
+            }
+            return
+        }
         let discovered = await Task.detached { SerialTransport.availablePorts() }.value
         if ports != discovered { ports = discovered }
         if selectedPath.isEmpty { selectedPath = ports.first?.path ?? "" }
     }
 
     func connect() async {
-        guard !isConnected, !isConnecting else { return }
+        guard !isConnected, !isConnecting, !isScanning else { return }
         guard let baud = Int(baudRate), (1...4_000_000).contains(baud) else {
             errorMessage = AppText.invalidBaud
             return
         }
+        let remote = connectionMode == .ssh
+        let ssh: SSHConfiguration?
+        do { ssh = remote ? try sshConfiguration() : nil }
+        catch { errorMessage = error.localizedDescription; return }
+        let path = remote ? remotePath.trimmingCharacters(in: .whitespacesAndNewlines) : selectedPath
         isConnecting = true
         connectionStatus = .connecting
         sessionID = UUID()
         let token = sessionID
-        let configuration = SerialConfiguration(path: selectedPath, baudRate: baud, dataBits: dataBits, stopBits: stopBits, parity: parity, flowControl: flowControl)
+        let configuration = SerialConfiguration(path: path, baudRate: baud, dataBits: dataBits, stopBits: stopBits, parity: parity, flowControl: flowControl)
+        let settingsID = sshSettingsID
+        if remote { sshSupportStatus = .checking; sshDeviceError = nil }
+        let endpoint = ssh.map { "ssh://" + $0.authority + path } ?? path
         do {
-            let stream = try await transport.open(configuration, generation: token)
+            let stream: AsyncThrowingStream<Data, Error>
+            if let ssh { stream = try await sshTransport.open(ssh, configuration: configuration, generation: token) }
+            else { stream = try await transport.open(configuration, generation: token) }
+            let report = remote ? await sshTransport.checkedSupport(for: token) : nil
             guard sessionID == token, !Task.isCancelled else {
                 await transport.close(ifGeneration: token)
+                await sshTransport.close(ifGeneration: token)
                 guard sessionID == token else { return }
                 isConnecting = false
                 connectionStatus = .disconnected
                 return
             }
+            if remote, sshSettingsID == settingsID { setSSHSupport(report) }
             decoder = StreamingTextDecoder(encoding: encoding)
             // Keep preprocessing on reconnect; require opting in again for a different port.
-            if let lastConnectedPath, lastConnectedPath != configuration.path {
+            if let lastConnectedPath, lastConnectedPath != endpoint {
                 preprocessingEnabled = false
             }
-            lastConnectedPath = configuration.path
+            lastConnectedPath = endpoint
             scriptError = nil
             resetScriptProcessing()
             resetSendScript()
+            connectedRemotely = remote
             isConnected = true
             isConnecting = false
-            connectionStatus = .connected(URL(fileURLWithPath: selectedPath).lastPathComponent)
+            let deviceName = URL(fileURLWithPath: path).lastPathComponent
+            connectionStatus = .connected(ssh.map { $0.authority + " · " + deviceName } ?? deviceName)
             savePreferences(force: true)
-            appendSystem(AppText.connectedMessage(selectedPath, configurationSummary, flowControl.title))
+            appendSystem(AppText.connectedMessage(endpoint, configurationSummary, flowControl.title))
             streamTask = Task { [weak self] in
                 do {
                     for try await data in stream {
@@ -188,7 +382,12 @@ final class SerialSession {
                 self.flush()
             }
         } catch {
+            let report = remote ? await sshTransport.checkedSupport(for: token) : nil
             guard sessionID == token else { return }
+            if remote, sshSettingsID == settingsID {
+                setSSHSupport(report, error: error)
+                if report == .supported { sshDeviceError = error.localizedDescription }
+            }
             isConnecting = false
             connectionStatus = .failed
             errorMessage = error.localizedDescription
@@ -210,7 +409,13 @@ final class SerialSession {
         isConnecting = false
         isSending = false
         connectionStatus = .disconnected
+        let closingScanID = scanID
+        scanID = UUID()
+        isScanning = false
+        if sshSupportStatus == .checking { sshSupportStatus = .unchecked }
         await transport.close(ifGeneration: closingSessionID)
+        await sshTransport.close(ifGeneration: closingSessionID)
+        await sshScanner.close(ifGeneration: closingScanID)
         guard sessionID == disconnectedSessionID else { return }
         if wasActive { appendSystem(AppText.portDisconnected) }
         flush()
@@ -235,7 +440,7 @@ final class SerialSession {
 
     private func writePayload(_ data: Data, token: UUID) async -> Bool {
         do {
-            let count = try await transport.write(data)
+            let count = connectedRemotely ? try await sshTransport.write(data) : try await transport.write(data)
             guard token == sessionID else { return false }
             sentBytes += count
             pendingEntries.append(LogEntry(date: Date(), direction: .sent, data: data, text: ""))
@@ -621,8 +826,21 @@ final class SerialSession {
     }
 
     private func savePreferences(force: Bool = false) {
+        if force, connectionMode == .ssh {
+            defaults.set(sshHost, forKey: "ssh.host")
+            defaults.set(sshPort, forKey: "ssh.port")
+            defaults.set(sshUsername, forKey: "ssh.username")
+            defaults.set(remotePath, forKey: "ssh.device")
+            defaults.set(sshAuthentication.rawValue, forKey: "ssh.authentication")
+            if let profile = selectedSSHProfile,
+               let configuration = try? sshConfiguration(), profile.matches(configuration) {
+                defaults.set(profile.id.uuidString, forKey: "ssh.profileID")
+            } else {
+                defaults.set("", forKey: "ssh.profileID")
+            }
+        }
         // Closing an unchanged window must not overwrite preferences saved by another window.
-        if force || selectedPath != savedPath {
+        if (force && connectionMode == .local) || selectedPath != savedPath {
             defaults.set(selectedPath, forKey: "serial.path")
             savedPath = selectedPath
         }
