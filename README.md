@@ -22,6 +22,9 @@ Download the macOS app directly from [Releases](https://github.com/txgde-space/s
 
 ## Features
 
+- **SSH remote serial** — Debug a remote host’s serial ports through SSH using `stty` and `cat`, with built-in compatibility checks and no Python dependency.
+- **Saved SSH hosts** — Select named hosts, use passwords or private keys, and store saved passwords in macOS Keychain.
+
 - **Multiple windows** — Press **⌘N** to open a new serial window. Each window has its own connection, log, and send draft.
 - **Multiple command presets** — Save multiple commands, edit them inline, and choose between **Send Once** and **Repeat** with an adjustable interval.
 - **Receive preprocessing** — Transform or filter incoming text lines with JavaScript.
