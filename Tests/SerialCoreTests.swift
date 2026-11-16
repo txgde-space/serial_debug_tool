@@ -186,6 +186,45 @@ struct PreprocessedSessionTests {
         await session.disconnect()
     }
 
+    @Test func processedRollingUpdatesMatchRebuildAfterPauseAndFormatChanges() async throws {
+        let context = try WindowTestContext()
+        defer { context.cleanUp() }
+        let device = try PseudoTerminal()
+        let session = try makeSession(context)
+        session.selectedPath = device.path
+        session.timestamps = false
+        session.showSystem = false
+        await session.connect()
+        defer { Task { await session.disconnect() } }
+        session.configurePreprocessing(source: "function process(t) { return 'processed:' + t; }", enabled: true)
+        for batch in 0..<20 {
+            let lines = (0..<100).map { "line-\(batch * 100 + $0)\n" }.joined()
+            try receiveFromDevice(lines, terminal: device)
+            try await waitUntil { session.logText.contains("processed:line-\(batch * 100 + 99)") }
+        }
+        #expect(session.preprocessingEnabled)
+        #expect(!session.logText.contains("processed:line-0\n"))
+        let incremental = session.logText
+        session.receiveHex = true
+        session.receiveHex = false
+        #expect(session.logText == incremental)
+
+        session.paused = true
+        let count = session.receivedBytes
+        try receiveFromDevice("paused\n", terminal: device)
+        try await waitUntil { session.receivedBytes == count + 7 }
+        #expect(session.logText == incremental)
+        session.paused = false
+        try receiveFromDevice("resumed\n", terminal: device)
+        try await waitUntil { session.logText.contains("processed:resumed") }
+        #expect(session.logText.contains("processed:paused"))
+        let resumed = session.logText
+        session.receiveHex = true
+        session.receiveHex = false
+        #expect(session.logText == resumed)
+        await session.disconnect()
+    }
+
     @Test func timeoutFallsBackToRawAndReceptionContinues() async throws {
         let context = try WindowTestContext()
         defer { context.cleanUp() }

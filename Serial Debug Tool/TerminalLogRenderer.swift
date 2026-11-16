@@ -25,6 +25,8 @@ struct TerminalLogRenderer {
         let content: String
         let display: String
         let utf16Count: Int
+        var matchesSearch: Bool
+        var search: String
     }
 
     private var rows = TerminalTextRows()
@@ -108,16 +110,23 @@ struct TerminalLogRenderer {
             if entry.direction == .sent && !options.showSent { continue }
             if entry.direction == .system && !options.showSystem { continue }
             let line: Line
-            if let cached = cache[entry.id] {
+            if var cached = cache[entry.id] {
+                if cached.search != options.search {
+                    cached.search = options.search
+                    cached.matchesSearch = options.search.isEmpty || cached.content.localizedCaseInsensitiveContains(options.search)
+                    cache[entry.id] = cached
+                }
                 line = cached
             } else {
                 let content = entry.direction == .system ? entry.text : options.hex ? PayloadCodec.hex(entry.data) : entry.text
                 let time = options.timestamps ? "[\(formatter.string(from: entry.date))] " : ""
                 let display = "\(time)\(entry.direction.rawValue)  \(content)"
-                line = Line(id: entry.id, content: content, display: display, utf16Count: display.utf16.count)
+                line = Line(id: entry.id, content: content, display: display, utf16Count: display.utf16.count,
+                            matchesSearch: options.search.isEmpty || content.localizedCaseInsensitiveContains(options.search),
+                            search: options.search)
                 cache[entry.id] = line
             }
-            if options.search.isEmpty || line.content.localizedCaseInsensitiveContains(options.search) {
+            if line.matchesSearch {
                 next.append(line)
             }
         }

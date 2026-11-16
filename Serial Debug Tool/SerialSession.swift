@@ -412,8 +412,10 @@ final class SerialSession {
         discardedEntries = 0
         decoder = StreamingTextDecoder(encoding: encoding)
         renderer.clear()
-        logText = renderer.text
-        logUpdate = renderer.update
+        if logUpdate.revision != renderer.update.revision {
+            logText = renderer.text
+            logUpdate = renderer.update
+        }
         needsRender = false
     }
 
@@ -524,14 +526,16 @@ final class SerialSession {
         refreshLogDisplay()
     }
 
-    private func renderLog(appendedEntries: [LogEntry], removedEntryIDs: [UUID]) {
+    private func renderLog(appendedEntries: [LogEntry], removedEntryIDs: [UUID], processedUpdate: Bool = false) {
         let processed = preprocessingEnabled && !receiveHex
+        // Raw input updates counters immediately; text changes only when the script returns.
+        guard !processed || processedUpdate || needsRender else { return }
         renderer.render(
             entries: processed ? processedEntries : entries,
             discardedEntries: processed ? processedDiscarded : discardedEntries,
             options: LogDisplayOptions(hex: receiveHex, timestamps: timestamps, showReceived: showReceived, showSent: showSent, showSystem: showSystem, search: search),
-            appendedEntries: processed ? nil : appendedEntries,
-            removedEntryIDs: processed ? [] : removedEntryIDs
+            appendedEntries: processed && !processedUpdate ? nil : appendedEntries,
+            removedEntryIDs: processed && !processedUpdate ? [] : removedEntryIDs
         )
         logText = renderer.text
         logUpdate = renderer.update
@@ -598,12 +602,13 @@ final class SerialSession {
                             removed += 1
                         }
                     }
+                    let removedIDs = self.processedEntries.prefix(removed).map(\.id)
                     if removed > 0 {
                         self.processedEntries.removeFirst(removed)
                         self.processedDiscarded += removed
                     }
-                    if !self.paused, !self.receiveHex {
-                        self.renderLog(appendedEntries: [], removedEntryIDs: [])
+                    if !self.paused, !self.receiveHex, !processed.isEmpty || removed > 0 {
+                        self.renderLog(appendedEntries: processed, removedEntryIDs: removedIDs, processedUpdate: true)
                     }
                 } while !self.scriptPendingEntries.isEmpty
                 self.scriptTask = nil

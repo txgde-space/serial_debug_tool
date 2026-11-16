@@ -245,6 +245,23 @@ struct TextLineBoundaryTests {
 
 @Suite("Log category visibility")
 struct LogVisibilityTests {
+    @Test func changingSearchWhileCategoryIsHiddenDoesNotReuseStaleMatches() {
+        let entries = [LogEntry(date: .now, direction: .received, data: Data(), text: "telemetry\n")]
+        var renderer = TerminalLogRenderer()
+        var mirror = TextMirror()
+        for options in [
+            LogDisplayOptions(timestamps: false, search: "telemetry"),
+            LogDisplayOptions(timestamps: false, showReceived: false, search: "missing"),
+            LogDisplayOptions(timestamps: false, search: "missing"),
+            LogDisplayOptions(timestamps: false, showReceived: false, search: "telemetry"),
+            LogDisplayOptions(timestamps: false, search: "telemetry")
+        ] {
+            renderer.render(entries: entries, discardedEntries: 0, options: options, appendedEntries: [])
+            mirror.apply(renderer.update)
+            #expect(mirror.text == referenceLog(entries, discarded: 0, options: options))
+        }
+    }
+
     @Test func eachCategoryCanBeHiddenAndRestoredWithoutLosingData() {
         let entries = [
             LogEntry(date: .now, direction: .received, data: Data("reply\n".utf8), text: "reply\n"),

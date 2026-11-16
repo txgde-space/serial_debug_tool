@@ -16,12 +16,14 @@ actor SerialTransport {
     private var originalOptions: termios?
     private var continuation: AsyncThrowingStream<Data, Error>.Continuation?
     private var reader: Task<Void, Never>?
+    private var readEvents: DescriptorReadEvents?
     private var generation = UUID()
     private var writing = false
     private var leasedPath: String?
 
     deinit {
         reader?.cancel()
+        readEvents?.cancel()
         if descriptor >= 0 {
             if var saved = originalOptions { _ = tcsetattr(descriptor, TCSANOW, &saved) }
             _ = ioctl(descriptor, TIOCNXCL)
@@ -119,6 +121,8 @@ actor SerialTransport {
                 throw Self.posixError(AppText.unsupportedBaud(configuration.baudRate))
             }
         }
+        let events = try DescriptorReadEvents(descriptors: [fd])
+        readEvents = events
         descriptor = fd
         leasedPath = path
         originalOptions = saved
@@ -130,9 +134,9 @@ actor SerialTransport {
         }
         configured = true
         reader = Task { [weak self] in
-            while !Task.isCancelled {
-                guard await self?.readAvailable(token: token) == true else { break }
-                do { try await Task.sleep(for: .milliseconds(10)) } catch { break }
+            for await _ in events.stream {
+                guard !Task.isCancelled, await self?.readAvailable(token: token) == true else { break }
+                events.rearm()
             }
         }
         return pair.stream
@@ -143,6 +147,8 @@ actor SerialTransport {
         generation = UUID()
         reader?.cancel()
         reader = nil
+        readEvents?.cancel()
+        readEvents = nil
         if descriptor >= 0 {
             if var saved = originalOptions { _ = tcsetattr(descriptor, TCSANOW, &saved) }
             _ = ioctl(descriptor, TIOCNXCL)
@@ -235,5 +241,91 @@ private final class SerialPortRegistry: @unchecked Sendable {
 
     func release(_ path: String) {
         _ = lock.withLock { paths.remove(path) }
+    }
+}
+
+
+/// Coalesces descriptor readiness into one wake-up until the consumer drains the input.
+/// Sources watch duplicated descriptors so asynchronous cancellation cannot observe a
+/// newly opened connection that reuses an old descriptor number.
+final class DescriptorReadEvents: @unchecked Sendable {
+    private struct Watch {
+        let source: DispatchSourceRead
+        var armed = true
+    }
+
+    let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+    private let queue = DispatchQueue(label: "serial.read-events", qos: .userInitiated)
+    // Accessed only on queue after initialization.
+    private var watches: [Int32: Watch] = [:]
+    private var stopped = false
+
+    init(descriptors: [Int32]) throws {
+        let pair = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        stream = pair.stream
+        continuation = pair.continuation
+        var copies: [(original: Int32, copy: Int32)] = []
+        for fd in descriptors {
+            let copy = dup(fd)
+            guard copy >= 0 else {
+                let error = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                for item in copies { Darwin.close(item.copy) }
+                throw error
+            }
+            _ = fcntl(copy, F_SETFD, FD_CLOEXEC)
+            copies.append((fd, copy))
+        }
+        // Populate all state before activating any handler.
+        for item in copies {
+            let source = DispatchSource.makeReadSource(fileDescriptor: item.copy, queue: queue)
+            source.setEventHandler { [weak self] in
+                guard let self, var watch = self.watches[item.original], watch.armed else { return }
+                watch.source.suspend()
+                watch.armed = false
+                self.watches[item.original] = watch
+                self.continuation.yield(())
+            }
+            source.setCancelHandler { Darwin.close(item.copy) }
+            watches[item.original] = Watch(source: source)
+        }
+        queue.async { [self] in
+            for watch in watches.values { watch.source.resume() }
+        }
+    }
+
+    func wake() { continuation.yield(()) }
+
+    func rearm() {
+        queue.async { [self] in
+            guard !stopped else { return }
+            for fd in Array(watches.keys) {
+                guard var watch = watches[fd], !watch.armed else { continue }
+                watch.armed = true
+                watches[fd] = watch
+                watch.source.resume()
+            }
+        }
+    }
+
+    func remove(_ descriptor: Int32) {
+        queue.async { [self] in
+            guard let watch = watches.removeValue(forKey: descriptor) else { return }
+            watch.source.cancel()
+            if !watch.armed { watch.source.resume() }
+        }
+    }
+
+    func cancel() {
+        queue.async { [self] in
+            guard !stopped else { return }
+            stopped = true
+            for watch in watches.values {
+                watch.source.cancel()
+                if !watch.armed { watch.source.resume() }
+            }
+            watches.removeAll()
+            continuation.finish()
+        }
     }
 }
