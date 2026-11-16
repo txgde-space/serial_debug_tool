@@ -93,12 +93,17 @@ enum SSHAuthenticationPrompt {
         let kind = environment["SSH_ASKPASS_PROMPT"]
         let confirming = kind == "confirm" || prompt.contains("yes/no")
         let notice = kind == "none"
-        if !confirming, SSHKeychain.isPasswordPrompt(prompt, kind: kind),
-           let account = environment["SERIAL_DEBUG_SSH_PASSWORD_ACCOUNT"],
-           let password = try? SSHKeychain().password(account: account),
-           !password.contains(where: { $0 == "\n" || $0 == "\r" || $0 == "\0" }) {
-            FileHandle.standardOutput.write(Data((password + "\n").utf8))
-            Darwin.exit(0)
+        if !confirming, SSHKeychain.isPasswordPrompt(prompt, kind: kind) {
+            do {
+                if let password = try SSHPasswordBroker.password(environment: environment) {
+                    FileHandle.standardOutput.write(Data((password + "\n").utf8))
+                    Darwin.exit(0)
+                }
+            } catch {
+                // A configured saved credential must not silently become another password dialog.
+                FileHandle.standardError.write(Data("Unable to read the saved SSH credential from the application.\n".utf8))
+                Darwin.exit(1)
+            }
         }
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)

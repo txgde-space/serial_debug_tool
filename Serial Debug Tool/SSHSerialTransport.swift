@@ -4,6 +4,7 @@ import Darwin
 /// One SSH process per connection. Pipes are nonblocking and only touched on this actor.
 actor SSHSerialTransport {
     private var process: Process?
+    private var passwordBroker: SSHPasswordBroker?
     private var input: FileHandle?
     private var output: FileHandle?
     private var errors: FileHandle?
@@ -29,13 +30,16 @@ actor SSHSerialTransport {
     private let executableURL: URL
     private let askPassURL: URL?
     private let knownHostsURL: URL?
+    private let passwordLookup: @Sendable (String) throws -> String?
 
     init(executableURL: URL = URL(fileURLWithPath: "/usr/bin/ssh"),
          askPassURL: URL? = Bundle.main.bundleURL.pathExtension == "app" ? Bundle.main.url(forAuxiliaryExecutable: "ReceiveScriptWorker") : nil,
-         knownHostsURL: URL? = nil) {
+         knownHostsURL: URL? = nil,
+         passwordLookup: @escaping @Sendable (String) throws -> String? = { try SSHKeychain().password(account: $0) }) {
         self.executableURL = executableURL
         self.askPassURL = askPassURL
         self.knownHostsURL = knownHostsURL
+        self.passwordLookup = passwordLookup
     }
 
     deinit {
@@ -94,6 +98,8 @@ actor SSHSerialTransport {
         var environment = ProcessInfo.processInfo.environment
         environment.removeValue(forKey: "SSH_AUTH_SOCK")
         environment.removeValue(forKey: "SERIAL_DEBUG_SSH_PASSWORD_ACCOUNT")
+        environment.removeValue(forKey: SSHPasswordBroker.socketKey)
+        environment.removeValue(forKey: SSHPasswordBroker.tokenKey)
         environment["LC_ALL"] = "C"
         if let askPassURL {
             environment["SSH_ASKPASS"] = askPassURL.path
@@ -105,8 +111,12 @@ actor SSHSerialTransport {
                           "trust": AppText.sshTrust, "confirm": AppText.confirm,
                           "cancel": AppText.cancel, "secret": AppText.sshSecret]
             environment["SERIAL_DEBUG_SSH_LABELS"] = String(data: try JSONEncoder().encode(labels), encoding: .utf8)
-            if ssh.authentication == .password {
-                environment["SERIAL_DEBUG_SSH_PASSWORD_ACCOUNT"] = ssh.passwordAccount
+            if ssh.authentication == .password, let account = ssh.passwordAccount,
+               let password = try passwordLookup(account) {
+                let broker = try SSHPasswordBroker(password: password)
+                passwordBroker = broker
+                environment[SSHPasswordBroker.socketKey] = broker.path
+                environment[SSHPasswordBroker.tokenKey] = broker.token
             }
         }
         child.environment = environment
@@ -202,6 +212,7 @@ actor SSHSerialTransport {
     }
 
     private func stopProcess() {
+        passwordBroker = nil
         reader?.cancel()
         reader = nil
         readEvents?.cancel()

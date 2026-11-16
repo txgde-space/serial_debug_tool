@@ -129,13 +129,19 @@ struct SSHProfileTests {
         let executable = directory.appendingPathComponent("ssh-fixture")
         let source = """
         #!/bin/sh
-        [ "$SERIAL_DEBUG_SSH_PASSWORD_ACCOUNT" = '\(saved.passwordAccount)' ] || exit 9
+        [ -n "$SERIAL_DEBUG_SSH_PASSWORD_SOCKET" ] || exit 9
+        [ -n "$SERIAL_DEBUG_SSH_PASSWORD_TOKEN" ] || exit 10
+        [ -z "$SERIAL_DEBUG_SSH_PASSWORD_ACCOUNT" ] || exit 11
         printf 'SERIAL_DEBUG_SUPPORT\\tOK\\nSERIAL_DEBUG_READY\\n/dev/ttyUSB0\\nSERIAL_DEBUG_END\\n'
         """
         try Data(source.utf8).write(to: executable)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
         let scanner = SSHSerialTransport(executableURL: executable, askPassURL: executable,
-            knownHostsURL: directory.appendingPathComponent("known_hosts"))
+            knownHostsURL: directory.appendingPathComponent("known_hosts"),
+            passwordLookup: { account in
+                guard account == saved.passwordAccount else { throw CocoaError(.fileReadNoSuchFile) }
+                return "fixture"
+            })
         let session = SerialSession(defaults: defaults, sshScanner: scanner, sshProfileStore: store)
         session.connectionMode = .ssh
         #expect(session.selectedSSHProfile?.id == saved.id)
